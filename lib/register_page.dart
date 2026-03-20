@@ -123,16 +123,38 @@ class _RegisterPageState extends State<RegisterPage> {
                   onChanged: (value) => carnet = value,
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Fecha de nacimiento (YYYY-MM-DD)',
-                    border: OutlineInputBorder(),
+                GestureDetector(
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime(2000),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                      locale: const Locale('es', 'ES'),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        fechaNacimiento =
+                            '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      decoration: InputDecoration(
+                        labelText: 'Fecha de nacimiento',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: const Icon(Icons.calendar_today),
+                        hintText: fechaNacimiento.isEmpty
+                            ? 'Selecciona una fecha'
+                            : null,
+                      ),
+                      controller: TextEditingController(text: fechaNacimiento),
+                      validator: (_) => fechaNacimiento.isNotEmpty
+                          ? null
+                          : 'Fecha requerida',
+                    ),
                   ),
-                  keyboardType: TextInputType.datetime,
-                  validator: (value) => value != null && value.isNotEmpty
-                      ? null
-                      : 'Fecha requerida',
-                  onChanged: (value) => fechaNacimiento = value,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
