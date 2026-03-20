@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'register_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -14,15 +18,49 @@ class _LoginPageState extends State<LoginPage> {
   String password = '';
   bool isLoading = false;
 
-  void _login() {
+  Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => isLoading = true);
-      // Aquí iría la lógica para llamar a tu backend
-      // Por ahora solo simula un login
-      Future.delayed(const Duration(seconds: 2), () {
+      try {
+        const String backendBaseUrl = 'http://192.168.0.4:3000/api/auth';
+        final String url = backendBaseUrl + '/login';
+        final response = await http.post(
+          Uri.parse(url),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email, 'password': password}),
+        );
         setState(() => isLoading = false);
-        // Navegar a la siguiente pantalla o mostrar error
-      });
+        try {
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          if (response.statusCode == 200 &&
+              data['message'] == 'Login exitoso') {
+            // Login exitoso, puedes guardar el token si lo necesitas
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomePage()),
+            );
+          } else {
+            final msg =
+                data['error'] ?? data['message'] ?? 'Error al iniciar sesión';
+            if (!mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(msg)));
+          }
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Respuesta inesperada: ${response.body}')),
+          );
+        }
+      } catch (e) {
+        setState(() => isLoading = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error de conexión: $e')));
+      }
     }
   }
 
