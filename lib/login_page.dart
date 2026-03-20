@@ -18,6 +18,8 @@ class _LoginPageState extends State<LoginPage> {
   String password = '';
   bool isLoading = false;
 
+  String? _token;
+
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => isLoading = true);
@@ -34,11 +36,12 @@ class _LoginPageState extends State<LoginPage> {
           final Map<String, dynamic> data = jsonDecode(response.body);
           if (response.statusCode == 200 &&
               data['message'] == 'Login exitoso') {
-            // Login exitoso, puedes guardar el token si lo necesitas
+            // Guardar el token
+            _token = data['token'];
             if (!mounted) return;
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const HomePage()),
+              MaterialPageRoute(builder: (_) => HomePage(token: _token)),
             );
           } else {
             final msg =
