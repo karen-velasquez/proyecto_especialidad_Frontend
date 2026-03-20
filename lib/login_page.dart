@@ -14,7 +14,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  String email = '';
+  String carnet = '';
   String password = '';
   bool isLoading = false;
 
@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
         final response = await http.post(
           Uri.parse(url),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'password': password}),
+          body: jsonEncode({'carnet': carnet, 'password': password}),
         );
         setState(() => isLoading = false);
         try {
@@ -94,14 +94,14 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 32),
                 TextFormField(
                   decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
+                    labelText: 'Carnet de identidad',
                     border: OutlineInputBorder(),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) => value != null && value.contains('@')
+                  keyboardType: TextInputType.number,
+                  validator: (value) => value != null && value.isNotEmpty
                       ? null
-                      : 'Correo inválido',
-                  onChanged: (value) => email = value,
+                      : 'Carnet requerido',
+                  onChanged: (value) => carnet = value,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

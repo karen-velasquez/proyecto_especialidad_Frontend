@@ -11,6 +11,92 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  void _showAddDogDialog() {
+    final _dogFormKey = GlobalKey<FormState>();
+    String name = '';
+    String breed = '';
+    String age = '';
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Registrar nuevo perro'),
+          content: Form(
+            key: _dogFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Nombre'),
+                  validator: (v) =>
+                      v != null && v.isNotEmpty ? null : 'Obligatorio',
+                  onChanged: (v) => name = v,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Raza'),
+                  validator: (v) =>
+                      v != null && v.isNotEmpty ? null : 'Obligatorio',
+                  onChanged: (v) => breed = v,
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Edad'),
+                  keyboardType: TextInputType.number,
+                  validator: (v) => v != null && int.tryParse(v) != null
+                      ? null
+                      : 'Número válido',
+                  onChanged: (v) => age = v,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (_dogFormKey.currentState!.validate()) {
+                  Navigator.pop(context);
+                  await _registerDog(name, breed, int.parse(age));
+                }
+              },
+              child: const Text('Registrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _registerDog(String name, String breed, int age) async {
+    try {
+      const String url = 'http://192.168.0.4:3000/api/dogs';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          if (widget.token != null) 'Authorization': 'Bearer ${widget.token}',
+        },
+        body: jsonEncode({'name': name, 'breed': breed, 'age': age}),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perro registrado correctamente')),
+        );
+        fetchDogs();
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${response.body}')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error de conexión: $e')));
+    }
+  }
+
   List<dynamic> dogs = [];
   bool isLoading = true;
   String? errorMsg;
@@ -87,9 +173,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Aquí puedes navegar a la pantalla de agregar perro
-        },
+        onPressed: _showAddDogDialog,
         child: const Icon(Icons.add),
         tooltip: 'Agregar perro',
       ),
