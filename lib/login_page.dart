@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -26,8 +27,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _goToRegister() {
-    // Aquí navegas a la pantalla de registro
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterPage()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RegisterPage()),
+    );
   }
 
   @override
