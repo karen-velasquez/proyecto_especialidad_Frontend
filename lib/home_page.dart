@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'add_dog_sheet.dart';
+import 'edit_profile_sheet.dart';
 
 class HomePage extends StatefulWidget {
   final String? token;
@@ -178,7 +179,14 @@ class _HomePageState extends State<HomePage>
               title: const Text('Editar perfil'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: navegar a editar perfil
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  builder: (_) => EditProfileSheet(token: widget.token),
+                );
               },
             ),
             const Divider(),
