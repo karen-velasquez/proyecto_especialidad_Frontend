@@ -109,6 +109,60 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  void _showDogDetail(Map<String, dynamic> dog) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.pets, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Text(dog['nombre'] ?? 'Sin nombre'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
+            _dogDetailRow(Icons.cake, 'Edad',
+                '${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses'),
+            _dogDetailRow(Icons.pets, 'Raza', dog['raza'] ?? '-'),
+            _dogDetailRow(
+              dog['esterilizado'] == true ? Icons.check_circle : Icons.cancel,
+              'Esterilizado',
+              dog['esterilizado'] == true ? 'Sí' : 'No',
+            ),
+            if (dog['esterilizado'] == true &&
+                dog['codigoEsterilizacion'] != null)
+              _dogDetailRow(
+                  Icons.tag, 'Código', dog['codigoEsterilizacion']),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dogDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.blueAccent),
+          const SizedBox(width: 8),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDogsTab() {
     if (isLoading) return const Center(child: CircularProgressIndicator());
     if (errorMsg != null) return Center(child: Text(errorMsg!));
@@ -129,6 +183,7 @@ class _HomePageState extends State<HomePage>
               'Edad: ${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses\n'
               'Género: ${dog['genero'] ?? '-'}',
             ),
+            onTap: () => _showDogDetail(dog),
           ),
         );
       },
