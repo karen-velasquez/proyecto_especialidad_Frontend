@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'add_dog_sheet.dart';
 import 'edit_profile_sheet.dart';
@@ -20,6 +22,9 @@ class _HomePageState extends State<HomePage>
   List<dynamic> dogs = [];
   bool isLoading = true;
   String? errorMsg;
+
+  File? _scanImage;
+  final _picker = ImagePicker();
 
   @override
   void initState() {
@@ -51,14 +56,31 @@ class _HomePageState extends State<HomePage>
   Future<void> _registerDog(Map<String, dynamic> data) async {
     try {
       const String url = 'http://192.168.0.4:3000/api/dogs';
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          if (widget.token != null) 'Authorization': 'Bearer ${widget.token}',
-        },
-        body: jsonEncode(data),
-      );
+      final request = http.MultipartRequest('POST', Uri.parse(url));
+
+      if (widget.token != null) {
+        request.headers['Authorization'] = 'Bearer ${widget.token}';
+      }
+
+      // Campos de texto
+      request.fields['nombre'] = data['nombre'] ?? '';
+      request.fields['genero'] = data['genero'] ?? '';
+      request.fields['edadAnios'] = data['edadAnios'].toString();
+      request.fields['edadMeses'] = data['edadMeses'].toString();
+      request.fields['raza'] = data['raza'] ?? '';
+      request.fields['esterilizado'] = data['esterilizado'].toString();
+      if (data['codigoEsterilizacion'] != null) {
+        request.fields['codigoEsterilizacion'] = data['codigoEsterilizacion'];
+      }
+
+      // Foto si fue seleccionada
+      if (data['fotoPath'] != null) {
+        request.files.add(await http.MultipartFile.fromPath('foto', data['fotoPath']));
+      }
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+
       if (!mounted) return;
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +156,11 @@ class _HomePageState extends State<HomePage>
                   color: AppColors.secondary.withValues(alpha: 0.25),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.pets, color: AppColors.secondary, size: 22),
+                child: const Icon(
+                  Icons.pets,
+                  color: AppColors.secondary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -154,26 +180,59 @@ class _HomePageState extends State<HomePage>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (dog['foto'] != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    dog['foto'],
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
             _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
-            _dogDetailRow(Icons.cake, 'Edad',
-                '${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses'),
+            _dogDetailRow(
+              Icons.cake,
+              'Edad',
+              '${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses',
+            ),
             _dogDetailRow(Icons.pets, 'Raza', dog['raza'] ?? '-'),
             _dogDetailRow(
               dog['esterilizado'] == true ? Icons.check_circle : Icons.cancel,
               'Esterilizado',
               dog['esterilizado'] == true ? 'Sí' : 'No',
             ),
-            if (dog['esterilizado'] == true && dog['codigoEsterilizacion'] != null)
+            if (dog['esterilizado'] == true &&
+                dog['codigoEsterilizacion'] != null)
               _dogDetailRow(Icons.tag, 'Código', dog['codigoEsterilizacion']),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(color: AppColors.primary),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _dogAvatarFallback() {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withValues(alpha: 0.2),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.pets, size: 26, color: AppColors.primary),
     );
   }
 
@@ -184,7 +243,13 @@ class _HomePageState extends State<HomePage>
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark)),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.dark,
+            ),
+          ),
           Expanded(child: Text(value)),
         ],
       ),
@@ -199,7 +264,10 @@ class _HomePageState extends State<HomePage>
     }
     if (errorMsg != null) {
       return Center(
-        child: Text(errorMsg!, style: const TextStyle(color: AppColors.highlight)),
+        child: Text(
+          errorMsg!,
+          style: const TextStyle(color: AppColors.highlight),
+        ),
       );
     }
     if (dogs.isEmpty) {
@@ -214,7 +282,11 @@ class _HomePageState extends State<HomePage>
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.secondary, width: 2),
               ),
-              child: const Icon(Icons.pets, size: 48, color: AppColors.secondary),
+              child: const Icon(
+                Icons.pets,
+                size: 48,
+                color: AppColors.secondary,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -253,14 +325,21 @@ class _HomePageState extends State<HomePage>
             ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.pets, size: 26, color: AppColors.primary),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: dog['foto'] != null
+                  ? Image.network(
+                      dog['foto'],
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _dogAvatarFallback(),
+                    )
+                  : _dogAvatarFallback(),
             ),
             title: Text(
               dog['nombre'] ?? 'Sin nombre',
@@ -279,7 +358,10 @@ class _HomePageState extends State<HomePage>
                 style: const TextStyle(color: AppColors.primary, fontSize: 12),
               ),
             ),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.secondary),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.secondary,
+            ),
             onTap: () => _showDogDetail(dog),
           ),
         );
@@ -287,11 +369,19 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Future<void> _pickScanImage(ImageSource source) async {
+    final picked = await _picker.pickImage(source: source, imageQuality: 90);
+    if (picked != null) {
+      setState(() => _scanImage = File(picked.path));
+    }
+  }
+
   Widget _buildScanTab() {
-    return Center(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Ícono principal
           Container(
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
@@ -303,7 +393,7 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 20),
           const Text(
-            'Escanear huella',
+            'Escanear huella nasal',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -312,9 +402,82 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 6),
           const Text(
-            'Próximamente disponible',
+            'Toma o sube una foto de la nariz del perro',
             style: TextStyle(color: AppColors.primary, fontSize: 13),
+            textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 32),
+
+          // Botones de acción
+          Row(
+            children: [
+              Expanded(
+                child: _ScanOptionButton(
+                  icon: Icons.camera_alt,
+                  label: 'Sacar foto',
+                  onTap: () => _pickScanImage(ImageSource.camera),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _ScanOptionButton(
+                  icon: Icons.photo_library,
+                  label: 'Subir imagen',
+                  onTap: () => _pickScanImage(ImageSource.gallery),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Preview de imagen
+          if (_scanImage != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.file(
+                _scanImage!,
+                width: double.infinity,
+                height: 260,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () => setState(() => _scanImage = null),
+                  icon: const Icon(Icons.delete_outline, color: AppColors.highlight, size: 18),
+                  label: const Text('Eliminar', style: TextStyle(color: AppColors.highlight)),
+                ),
+                TextButton.icon(
+                  onPressed: () => _pickScanImage(ImageSource.camera),
+                  icon: const Icon(Icons.refresh, color: AppColors.primary, size: 18),
+                  label: const Text('Cambiar', style: TextStyle(color: AppColors.primary)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                onPressed: () {
+                  // TODO: enviar imagen al modelo biométrico
+                },
+                child: const Text(
+                  'Analizar huella nasal',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -347,7 +510,11 @@ class _HomePageState extends State<HomePage>
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.secondary, width: 2),
                     ),
-                    child: const Icon(Icons.person, size: 36, color: Colors.white),
+                    child: const Icon(
+                      Icons.person,
+                      size: 36,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -370,7 +537,10 @@ class _HomePageState extends State<HomePage>
                     leading: const Icon(Icons.edit, color: AppColors.primary),
                     title: const Text(
                       'Editar perfil',
-                      style: TextStyle(color: AppColors.dark, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: AppColors.dark,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     onTap: () {
                       Navigator.pop(context);
@@ -378,7 +548,9 @@ class _HomePageState extends State<HomePage>
                         context: context,
                         isScrollControlled: true,
                         shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
                         ),
                         builder: (_) => EditProfileSheet(token: widget.token),
                       );
@@ -386,10 +558,16 @@ class _HomePageState extends State<HomePage>
                   ),
                   const Divider(indent: 16, endIndent: 16),
                   ListTile(
-                    leading: const Icon(Icons.logout, color: AppColors.highlight),
+                    leading: const Icon(
+                      Icons.logout,
+                      color: AppColors.highlight,
+                    ),
                     title: const Text(
                       'Cerrar sesión',
-                      style: TextStyle(color: AppColors.highlight, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: AppColors.highlight,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     onTap: () {
                       Navigator.pop(context);
@@ -406,39 +584,28 @@ class _HomePageState extends State<HomePage>
         backgroundColor: AppColors.dark,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: Row(
-          children: [
-            const Icon(Icons.pets, color: AppColors.secondary, size: 22),
-            const SizedBox(width: 8),
-            const Text(
-              'Dog Biometric',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.accent,
           indicatorWeight: 3,
           labelColor: AppColors.accent,
           unselectedLabelColor: AppColors.secondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.pets), text: 'Mis Perros'),
-            Tab(icon: Text('🐽', style: TextStyle(fontSize: 20)), text: 'Escanear'),
+            Tab(
+              icon: Text('🐽', style: TextStyle(fontSize: 20)),
+              text: 'Escanear',
+            ),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildDogsTab(),
-          _buildScanTab(),
-        ],
+        children: [_buildDogsTab(), _buildScanTab()],
       ),
       floatingActionButton: ListenableBuilder(
         listenable: _tabController,
@@ -454,6 +621,62 @@ class _HomePageState extends State<HomePage>
           }
           return const SizedBox.shrink();
         },
+      ),
+    );
+  }
+}
+
+class _ScanOptionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ScanOptionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.dark.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 28),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.dark,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
