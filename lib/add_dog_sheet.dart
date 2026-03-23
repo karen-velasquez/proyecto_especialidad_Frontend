@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'app_colors.dart';
 import 'dog_detector.dart';
+import 'breed_classifier.dart';
 
 const List<String> kRazas = [
   'Mestizo',
@@ -61,6 +62,7 @@ class _AddDogSheetState extends State<AddDogSheet> {
   String codigoEsterilizacion = '';
   File? fotoFile;
   bool _detectando = false;
+  List<BreedResult> _razasDetectadas = [];
 
   Future<void> _tomarFoto() async {
     final picker = ImagePicker();
@@ -107,11 +109,10 @@ class _AddDogSheetState extends State<AddDogSheet> {
     final hayPerro = await _detectarPerro(picked.path);
 
     if (!mounted) return;
-    setState(() => _detectando = false);
 
-    if (hayPerro) {
-      setState(() => fotoFile = File(picked.path));
-    } else {
+    if (!hayPerro) {
+      setState(() => _detectando = false);
+
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -162,6 +163,105 @@ class _AddDogSheetState extends State<AddDogSheet> {
           ],
         ),
       );
+      return;
+    }
+
+    // Hay perro — clasificar razas
+    final razas = await BreedClassifier().classify(picked.path);
+    if (!mounted) return;
+    setState(() {
+      _detectando = false;
+      fotoFile = File(picked.path);
+      _razasDetectadas = razas;
+    });
+
+    // Mostrar dialog con las razas detectadas
+    if (razas.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: EdgeInsets.zero,
+          title: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.dark, AppColors.primary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.auto_awesome, color: AppColors.accent, size: 22),
+                SizedBox(width: 10),
+                Text(
+                  'Razas detectadas',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Basado en la foto, tu perro podría ser:',
+                style: TextStyle(color: AppColors.dark, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              ...razas.map((r) {
+                final pct = (r.confidence * 100).toStringAsFixed(1);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            r.breed,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.dark,
+                            ),
+                          ),
+                          Text(
+                            '$pct%',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: r.confidence,
+                          backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
+                          valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                          minHeight: 6,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido', style: TextStyle(color: AppColors.primary)),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -187,6 +287,10 @@ class _AddDogSheetState extends State<AddDogSheet> {
         if (esterilizado && codigoEsterilizacion.isNotEmpty)
           'codigoEsterilizacion': codigoEsterilizacion,
         if (fotoFile != null) 'fotoPath': fotoFile!.path,
+        if (_razasDetectadas.isNotEmpty)
+          'razasDetectadas': _razasDetectadas
+              .map((r) => {'raza': r.breed, 'confianza': r.confidence})
+              .toList(),
       };
       Navigator.pop(context, data);
     }
@@ -353,6 +457,75 @@ class _AddDogSheetState extends State<AddDogSheet> {
                           label: const Text('Cambiar foto', style: TextStyle(color: AppColors.primary, fontSize: 12)),
                         ),
                       ),
+                    // Razas detectadas
+                    if (_razasDetectadas.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Razas detectadas',
+                                  style: TextStyle(
+                                    color: AppColors.dark,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ..._razasDetectadas.map((r) {
+                              final pct = (r.confidence * 100).toStringAsFixed(1);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        r.breed,
+                                        style: const TextStyle(fontSize: 12, color: AppColors.dark),
+                                      ),
+                                    ),
+                                    Text(
+                                      '$pct%',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 80,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: r.confidence,
+                                          backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
+                                          valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                                          minHeight: 5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
 
                     // Nombre

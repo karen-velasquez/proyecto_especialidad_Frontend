@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'add_dog_sheet.dart';
 import 'edit_profile_sheet.dart';
 import 'app_colors.dart';
+import 'breed_classifier.dart';
+import 'dog_detector.dart';
 
 class HomePage extends StatefulWidget {
   final String? token;
@@ -24,6 +26,8 @@ class _HomePageState extends State<HomePage>
   String? errorMsg;
 
   File? _scanImage;
+  bool _scanAnalizando = false;
+  List<BreedResult> _scanRazas = [];
   final _picker = ImagePicker();
 
   @override
@@ -71,6 +75,11 @@ class _HomePageState extends State<HomePage>
       request.fields['esterilizado'] = data['esterilizado'].toString();
       if (data['codigoEsterilizacion'] != null) {
         request.fields['codigoEsterilizacion'] = data['codigoEsterilizacion'];
+      }
+
+      // Razas detectadas por el modelo
+      if (data['razasDetectadas'] != null) {
+        request.fields['razasDetectadas'] = jsonEncode(data['razasDetectadas']);
       }
 
       // Foto si fue seleccionada
@@ -371,9 +380,204 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _pickScanImage(ImageSource source) async {
     final picked = await _picker.pickImage(source: source, imageQuality: 90);
-    if (picked != null) {
-      setState(() => _scanImage = File(picked.path));
+    if (picked == null) return;
+
+    setState(() {
+      _scanAnalizando = true;
+      _scanImage = File(picked.path);
+      _scanRazas = [];
+    });
+
+    // 1. Detectar si hay perro
+    final detector = DogDetector();
+    bool hayPerro = false;
+    try {
+      await detector.load();
+      hayPerro = await detector.containsDog(picked.path);
+    } finally {
+      detector.dispose();
     }
+
+    if (!mounted) return;
+
+    if (!hayPerro) {
+      setState(() {
+        _scanAnalizando = false;
+        _scanImage = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se detectó un perro en la imagen. Intenta de nuevo.')),
+      );
+      return;
+    }
+
+    // 2. Clasificar razas
+    final razas = await BreedClassifier().classify(picked.path);
+    if (!mounted) return;
+    setState(() {
+      _scanAnalizando = false;
+      _scanRazas = razas;
+    });
+
+    // 3. Buscar coincidencias con la raza principal (>60%)
+    if (razas.isNotEmpty) {
+      await _buscarCoincidencias(razas.first);
+    }
+  }
+
+  Future<void> _buscarCoincidencias(BreedResult razaPrincipal) async {
+    try {
+      final uri = Uri.parse(
+        'http://192.168.0.4:3000/api/dogs/search-by-breed'
+        '?raza=${Uri.encodeComponent(razaPrincipal.breed)}&minConfianza=0.6',
+      );
+      final response = await http.get(
+        uri,
+        headers: widget.token != null ? {'Authorization': 'Bearer ${widget.token}'} : {},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final List<dynamic> dogs = jsonDecode(response.body);
+        _mostrarCoincidencias(razaPrincipal, dogs);
+      }
+    } catch (_) {}
+  }
+
+  void _mostrarCoincidencias(BreedResult razaPrincipal, List<dynamic> dogs) {
+    final pct = (razaPrincipal.confidence * 100).toStringAsFixed(1);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.dark, AppColors.primary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.search, color: AppColors.accent, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Coincidencias encontradas',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${razaPrincipal.breed} · $pct% de coincidencia',
+                style: const TextStyle(color: AppColors.secondary, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        content: dogs.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No se encontraron perros con más del 60% de esta raza en la base de datos.',
+                  style: TextStyle(color: AppColors.dark),
+                ),
+              )
+            : SizedBox(
+                width: double.maxFinite,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: dogs.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final dog = dogs[i];
+                    final owner = dog['owner'];
+                    final ownerName = owner != null
+                        ? '${owner['nombres'] ?? ''} ${owner['apellidos'] ?? ''}'.trim()
+                        : 'Desconocido';
+                    // Confianza de la raza buscada en este perro
+                    final razaMatch = (dog['razasDetectadas'] as List?)
+                        ?.firstWhere(
+                          (r) => r['raza'] == razaPrincipal.breed,
+                          orElse: () => null,
+                        );
+                    final matchPct = razaMatch != null
+                        ? '${((razaMatch['confianza'] as num) * 100).toStringAsFixed(1)}%'
+                        : '-';
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      leading: dog['foto'] != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.network(
+                                dog['foto'],
+                                width: 46,
+                                height: 46,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _dogAvatarFallback(),
+                              ),
+                            )
+                          : _dogAvatarFallback(),
+                      title: Text(
+                        dog['nombre'] ?? 'Sin nombre',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark, fontSize: 14),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dog['raza'] ?? '-',
+                            style: const TextStyle(color: AppColors.primary, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline, size: 12, color: AppColors.secondary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  ownerName,
+                                  style: const TextStyle(color: AppColors.secondary, fontSize: 11),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          matchPct,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildScanTab() {
@@ -430,23 +634,139 @@ class _HomePageState extends State<HomePage>
           ),
           const SizedBox(height: 28),
 
+          // Estado de análisis
+          if (_scanAnalizando) ...[
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 12),
+            const Text(
+              'Analizando imagen...',
+              style: TextStyle(color: AppColors.primary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+          ],
+
           // Preview de imagen
-          if (_scanImage != null) ...[
+          if (_scanImage != null && !_scanAnalizando) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.file(
                 _scanImage!,
                 width: double.infinity,
-                height: 260,
+                height: 220,
                 fit: BoxFit.cover,
               ),
             ),
             const SizedBox(height: 12),
+
+            // Razas detectadas
+            if (_scanRazas.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.dark.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Razas detectadas',
+                          style: TextStyle(
+                            color: AppColors.dark,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ..._scanRazas.map((r) {
+                      final pct = (r.confidence * 100).toStringAsFixed(1);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  r.breed,
+                                  style: const TextStyle(
+                                    color: AppColors.dark,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  '$pct%',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: r.confidence,
+                                backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
+                                valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                                minHeight: 6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 2,
+                  ),
+                  onPressed: () => _buscarCoincidencias(_scanRazas.first),
+                  icon: const Icon(Icons.search),
+                  label: const Text(
+                    'Buscar coincidencias',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 TextButton.icon(
-                  onPressed: () => setState(() => _scanImage = null),
+                  onPressed: () => setState(() {
+                    _scanImage = null;
+                    _scanRazas = [];
+                  }),
                   icon: const Icon(Icons.delete_outline, color: AppColors.highlight, size: 18),
                   label: const Text('Eliminar', style: TextStyle(color: AppColors.highlight)),
                 ),
@@ -456,26 +776,6 @@ class _HomePageState extends State<HomePage>
                   label: const Text('Cambiar', style: TextStyle(color: AppColors.primary)),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 2,
-                ),
-                onPressed: () {
-                  // TODO: enviar imagen al modelo biométrico
-                },
-                child: const Text(
-                  'Analizar huella nasal',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ),
             ),
           ],
         ],

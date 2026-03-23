@@ -27,3 +27,4 @@ flutter:
 
   assets:
     - assets/models/yolov8n_float16.tflite
+    - assets/models/yolov8n-cls_float32.tflite
