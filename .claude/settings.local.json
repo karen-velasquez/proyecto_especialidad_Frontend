@@ -3,7 +3,13 @@
     "allow": [
       "Bash(flutter pub:*)",
       "Bash(flutter analyze:*)",
-      "Bash(find c:UsersHpDesktopMAESTRIAESPECIALIDADPROYECTO_FINAL -name *.py -o -name *.java -o -name requirements.txt -o -name pom.xml)"
+      "Bash(find c:UsersHpDesktopMAESTRIAESPECIALIDADPROYECTO_FINAL -name *.py -o -name *.java -o -name requirements.txt -o -name pom.xml)",
+      "Bash(find /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/dog_biometric_frontend/lib -maxdepth 2 -type f -name *.dart)",
+      "Read(//c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/**)",
+      "Bash(grep -r \"http\\\\|url\\\\|API\\\\|baseUrl\\\\|server\" /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/dog_biometric_frontend/lib --include=*.dart)",
+      "Bash(find /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/FRONTEND/dog_biometric_api/src -type f -name *.js)",
+      "Bash(find /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/dog_biometric_frontend/lib -maxdepth 1 -type f -name *.dart)",
+      "Bash(xargs wc:*)"
     ]
   }
 }
