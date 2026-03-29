@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'dart:convert';
-import 'app_colors.dart';
-
-const String backendBaseUrl = 'http://192.168.0.4:3000/api/auth';
+import '../core/app_colors.dart';
+import '../core/constants.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -48,7 +47,7 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => isLoading = true);
       try {
         final response = await http.post(
-          Uri.parse('$backendBaseUrl/register'),
+          Uri.parse('${ApiConstants.authUrl}/register'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'nombres': nombres,
@@ -314,7 +313,6 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.phone,
                             onChanged: (phone) {
                               telefono = phone.completeNumber;
-                              // isValidNumber() valida según las reglas del país seleccionado
                               setState(() {
                                 _phoneValid = phone.isValidNumber();
                               });

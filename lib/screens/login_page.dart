@@ -4,7 +4,8 @@ import 'register_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'home_page.dart';
-import 'app_colors.dart';
+import '../core/app_colors.dart';
+import '../core/constants.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -26,8 +27,7 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => isLoading = true);
       try {
-        const String backendBaseUrl = 'http://192.168.0.4:3000/api/auth';
-        final String url = backendBaseUrl + '/login';
+        final String url = '${ApiConstants.authUrl}/login';
         final response = await http.post(
           Uri.parse(url),
           headers: {'Content-Type': 'application/json'},

@@ -76,15 +76,20 @@ Aplicación móvil desarrollada con **Flutter** para el registro y gestión biom
 ```
 dog_biometric_frontend/
 ├── lib/
-│   ├── main.dart                  # Punto de entrada de la aplicación
-│   ├── app_colors.dart            # Paleta de colores de la app
-│   ├── login_page.dart            # Pantalla de inicio de sesión
-│   ├── register_page.dart         # Pantalla de registro de usuario
-│   ├── home_page.dart             # Dashboard principal
-│   ├── add_dog_sheet.dart         # Formulario de registro de perros
-│   ├── edit_profile_sheet.dart    # Edición del perfil de usuario
-│   ├── breed_classifier.dart      # Clasificación de raza (TFLite)
-│   └── dog_detector.dart          # Detección de perros (YOLOv8)
+│   ├── main.dart                          # Punto de entrada de la aplicación
+│   ├── core/
+│   │   ├── app_colors.dart                # Paleta de colores de la app
+│   │   └── constants.dart                 # URL base de la API y constantes
+│   ├── screens/
+│   │   ├── login_page.dart                # Pantalla de inicio de sesión
+│   │   ├── register_page.dart             # Pantalla de registro de usuario
+│   │   ├── home_page.dart                 # Dashboard principal
+│   │   ├── add_dog_sheet.dart             # Formulario de registro de perros
+│   │   └── edit_profile_sheet.dart        # Edición del perfil de usuario
+│   └── services/
+│       └── ml/
+│           ├── breed_classifier.dart      # Clasificación de raza (TFLite)
+│           └── dog_detector.dart          # Detección de perros (YOLOv8)
 ├── assets/
 │   └── models/
 │       ├── yolov8n_float16.tflite         # Modelo de detección de objetos

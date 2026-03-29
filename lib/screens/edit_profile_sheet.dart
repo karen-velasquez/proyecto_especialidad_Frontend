@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'app_colors.dart';
+import '../core/app_colors.dart';
+import '../core/constants.dart';
 
 class EditProfileSheet extends StatefulWidget {
   final String? token;
@@ -33,7 +34,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   Future<void> _loadProfile() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.4:3000/api/users/me'),
+        Uri.parse('${ApiConstants.usersUrl}/me'),
         headers: {
           if (widget.token != null) 'Authorization': 'Bearer ${widget.token}',
         },
@@ -84,7 +85,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     setState(() => isLoading = true);
     try {
       final response = await http.put(
-        Uri.parse('http://192.168.0.4:3000/api/users/me'),
+        Uri.parse('${ApiConstants.usersUrl}/me'),
         headers: {
           'Content-Type': 'application/json',
           if (widget.token != null) 'Authorization': 'Bearer ${widget.token}',
@@ -143,7 +144,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           const SizedBox(height: 12),
           Container(
             width: 40,
@@ -153,8 +153,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
-          // Header con gradiente
           Container(
             margin: const EdgeInsets.only(top: 16),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -187,8 +185,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               ],
             ),
           ),
-
-          // Contenido
           Flexible(
             flex: 1,
             child: ConstrainedBox(
@@ -214,7 +210,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Sección: Información personal
                           const Text(
                             'Información personal',
                             style: TextStyle(
@@ -224,7 +219,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                             ),
                           ),
                           const SizedBox(height: 12),
-
                           Row(
                             children: [
                               Expanded(
@@ -247,14 +241,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                             ],
                           ),
                           const SizedBox(height: 14),
-
                           TextFormField(
                             controller: _telefonoCtrl,
                             decoration: _fieldDecoration('Teléfono', Icons.phone),
                             keyboardType: TextInputType.phone,
                           ),
                           const SizedBox(height: 14),
-
                           TextFormField(
                             controller: _emailCtrl,
                             decoration: _fieldDecoration('Correo electrónico (opcional)', Icons.email),
@@ -267,8 +259,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                             },
                           ),
                           const SizedBox(height: 14),
-
-                          // Fecha de nacimiento
                           GestureDetector(
                             onTap: () async {
                               final initial = fechaNacimiento.isNotEmpty
@@ -319,8 +309,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                             ),
                           ),
                           const SizedBox(height: 28),
-
-                          // Botones
                           Row(
                             children: [
                               Expanded(

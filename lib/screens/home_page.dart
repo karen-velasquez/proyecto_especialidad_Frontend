@@ -6,9 +6,10 @@ import 'dart:convert';
 import 'add_dog_sheet.dart';
 import 'edit_profile_sheet.dart';
 import 'login_page.dart';
-import 'app_colors.dart';
-import 'breed_classifier.dart';
-import 'dog_detector.dart';
+import '../core/app_colors.dart';
+import '../core/constants.dart';
+import '../services/ml/breed_classifier.dart';
+import '../services/ml/dog_detector.dart';
 
 class HomePage extends StatefulWidget {
   final String? token;
@@ -44,7 +45,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _loadUserProfile() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.0.4:3000/api/users/me'),
+        Uri.parse('${ApiConstants.usersUrl}/me'),
         headers: widget.token != null ? {'Authorization': 'Bearer ${widget.token}'} : {},
       );
       if (response.statusCode == 200 && mounted) {
@@ -75,14 +76,12 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _registerDog(Map<String, dynamic> data) async {
     try {
-      const String url = 'http://192.168.0.4:3000/api/dogs';
-      final request = http.MultipartRequest('POST', Uri.parse(url));
+      final request = http.MultipartRequest('POST', Uri.parse(ApiConstants.dogsUrl));
 
       if (widget.token != null) {
         request.headers['Authorization'] = 'Bearer ${widget.token}';
       }
 
-      // Campos de texto
       request.fields['nombre'] = data['nombre'] ?? '';
       request.fields['genero'] = data['genero'] ?? '';
       request.fields['edadAnios'] = data['edadAnios'].toString();
@@ -92,13 +91,9 @@ class _HomePageState extends State<HomePage>
       if (data['codigoEsterilizacion'] != null) {
         request.fields['codigoEsterilizacion'] = data['codigoEsterilizacion'];
       }
-
-      // Razas detectadas por el modelo
       if (data['razasDetectadas'] != null) {
         request.fields['razasDetectadas'] = jsonEncode(data['razasDetectadas']);
       }
-
-      // Foto si fue seleccionada
       if (data['fotoPath'] != null) {
         request.files.add(await http.MultipartFile.fromPath('foto', data['fotoPath']));
       }
@@ -131,9 +126,8 @@ class _HomePageState extends State<HomePage>
       errorMsg = null;
     });
     try {
-      const String url = 'http://192.168.0.4:3000/api/dogs';
       final response = await http.get(
-        Uri.parse(url),
+        Uri.parse(ApiConstants.dogsUrl),
         headers: widget.token != null
             ? {'Authorization': 'Bearer ${widget.token}'}
             : {},
@@ -181,11 +175,7 @@ class _HomePageState extends State<HomePage>
                   color: AppColors.secondary.withValues(alpha: 0.25),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.pets,
-                  color: AppColors.secondary,
-                  size: 22,
-                ),
+                child: const Icon(Icons.pets, color: AppColors.secondary, size: 22),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -231,18 +221,14 @@ class _HomePageState extends State<HomePage>
               'Esterilizado',
               dog['esterilizado'] == true ? 'Sí' : 'No',
             ),
-            if (dog['esterilizado'] == true &&
-                dog['codigoEsterilizacion'] != null)
+            if (dog['esterilizado'] == true && dog['codigoEsterilizacion'] != null)
               _dogDetailRow(Icons.tag, 'Código', dog['codigoEsterilizacion']),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cerrar',
-              style: TextStyle(color: AppColors.primary),
-            ),
+            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -270,10 +256,7 @@ class _HomePageState extends State<HomePage>
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppColors.dark,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark),
           ),
           Expanded(child: Text(value)),
         ],
@@ -283,16 +266,11 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildDogsTab() {
     if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
     if (errorMsg != null) {
       return Center(
-        child: Text(
-          errorMsg!,
-          style: const TextStyle(color: AppColors.highlight),
-        ),
+        child: Text(errorMsg!, style: const TextStyle(color: AppColors.highlight)),
       );
     }
     if (dogs.isEmpty) {
@@ -307,20 +285,12 @@ class _HomePageState extends State<HomePage>
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.secondary, width: 2),
               ),
-              child: const Icon(
-                Icons.pets,
-                size: 48,
-                color: AppColors.secondary,
-              ),
+              child: const Icon(Icons.pets, size: 48, color: AppColors.secondary),
             ),
             const SizedBox(height: 16),
             const Text(
               'No tienes perros registrados',
-              style: TextStyle(
-                color: AppColors.dark,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: AppColors.dark, fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -350,10 +320,7 @@ class _HomePageState extends State<HomePage>
             ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(30),
               child: dog['foto'] != null
@@ -383,10 +350,7 @@ class _HomePageState extends State<HomePage>
                 style: const TextStyle(color: AppColors.primary, fontSize: 12),
               ),
             ),
-            trailing: const Icon(
-              Icons.chevron_right,
-              color: AppColors.secondary,
-            ),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.secondary),
             onTap: () => _showDogDetail(dog),
           ),
         );
@@ -404,7 +368,6 @@ class _HomePageState extends State<HomePage>
       _scanRazas = [];
     });
 
-    // 1. Detectar si hay perro
     final detector = DogDetector();
     bool hayPerro = false;
     try {
@@ -427,7 +390,6 @@ class _HomePageState extends State<HomePage>
       return;
     }
 
-    // 2. Clasificar razas
     final razas = await BreedClassifier().classify(picked.path);
     if (!mounted) return;
     setState(() {
@@ -435,7 +397,6 @@ class _HomePageState extends State<HomePage>
       _scanRazas = razas;
     });
 
-    // 3. Buscar coincidencias con la raza principal (>60%)
     if (razas.isNotEmpty) {
       await _buscarCoincidencias(razas.first);
     }
@@ -444,7 +405,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _buscarCoincidencias(BreedResult razaPrincipal) async {
     try {
       final uri = Uri.parse(
-        'http://192.168.0.4:3000/api/dogs/search-by-breed'
+        '${ApiConstants.dogsUrl}/search-by-breed'
         '?raza=${Uri.encodeComponent(razaPrincipal.breed)}&minConfianza=0.6',
       );
       final response = await http.get(
@@ -453,8 +414,8 @@ class _HomePageState extends State<HomePage>
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
-        final List<dynamic> dogs = jsonDecode(response.body);
-        _mostrarCoincidencias(razaPrincipal, dogs);
+        final List<dynamic> coincidencias = jsonDecode(response.body);
+        _mostrarCoincidencias(razaPrincipal, coincidencias);
       }
     } catch (_) {}
   }
@@ -520,7 +481,6 @@ class _HomePageState extends State<HomePage>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Foto del perro
               if (dog['foto'] != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -535,7 +495,6 @@ class _HomePageState extends State<HomePage>
                     ),
                   ),
                 ),
-              // Info del perro
               _dogDetailRow(Icons.pets, 'Raza', dog['raza'] ?? '-'),
               _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
               _dogDetailRow(
@@ -549,7 +508,6 @@ class _HomePageState extends State<HomePage>
                 dog['esterilizado'] == true ? 'Sí' : 'No',
               ),
               const Divider(height: 24),
-              // Info del dueño
               const Row(
                 children: [
                   Icon(Icons.person, color: AppColors.primary, size: 16),
@@ -583,7 +541,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  void _mostrarCoincidencias(BreedResult razaPrincipal, List<dynamic> dogs) {
+  void _mostrarCoincidencias(BreedResult razaPrincipal, List<dynamic> coincidencias) {
     final pct = (razaPrincipal.confidence * 100).toStringAsFixed(1);
     showDialog(
       context: context,
@@ -621,7 +579,7 @@ class _HomePageState extends State<HomePage>
             ],
           ),
         ),
-        content: dogs.isEmpty
+        content: coincidencias.isEmpty
             ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
@@ -633,15 +591,14 @@ class _HomePageState extends State<HomePage>
                 width: double.maxFinite,
                 child: ListView.separated(
                   shrinkWrap: true,
-                  itemCount: dogs.length,
+                  itemCount: coincidencias.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) {
-                    final dog = dogs[i];
+                    final dog = coincidencias[i];
                     final owner = dog['owner'];
                     final ownerName = owner != null
                         ? '${owner['nombres'] ?? ''} ${owner['apellidos'] ?? ''}'.trim()
                         : 'Desconocido';
-                    // Confianza de la raza buscada en este perro
                     final razaMatch = (dog['razasDetectadas'] as List?)
                         ?.firstWhere(
                           (r) => r['raza'] == razaPrincipal.breed,
@@ -726,7 +683,6 @@ class _HomePageState extends State<HomePage>
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         children: [
-          // Ícono principal — se oculta cuando hay imagen o se está analizando
           if (_scanImage == null && !_scanAnalizando) ...[
             Container(
               padding: const EdgeInsets.all(28),
@@ -740,11 +696,7 @@ class _HomePageState extends State<HomePage>
             const SizedBox(height: 20),
             const Text(
               'Escanear huella nasal',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.dark,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.dark),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -754,8 +706,6 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 32),
           ],
-
-          // Botones de acción
           Row(
             children: [
               Expanded(
@@ -776,8 +726,6 @@ class _HomePageState extends State<HomePage>
             ],
           ),
           const SizedBox(height: 28),
-
-          // Estado de análisis
           if (_scanAnalizando) ...[
             const CircularProgressIndicator(color: AppColors.primary),
             const SizedBox(height: 12),
@@ -787,8 +735,6 @@ class _HomePageState extends State<HomePage>
             ),
             const SizedBox(height: 20),
           ],
-
-          // Preview de imagen
           if (_scanImage != null && !_scanAnalizando) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -800,8 +746,6 @@ class _HomePageState extends State<HomePage>
               ),
             ),
             const SizedBox(height: 12),
-
-            // Razas detectadas
             if (_scanRazas.isNotEmpty) ...[
               Container(
                 width: double.infinity,
@@ -900,7 +844,6 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ],
-
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1021,10 +964,7 @@ class _HomePageState extends State<HomePage>
                     leading: const Icon(Icons.edit, color: AppColors.primary),
                     title: const Text(
                       'Editar perfil',
-                      style: TextStyle(
-                        color: AppColors.dark,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(color: AppColors.dark, fontWeight: FontWeight.w500),
                     ),
                     onTap: () {
                       Navigator.pop(context);
@@ -1032,9 +972,7 @@ class _HomePageState extends State<HomePage>
                         context: context,
                         isScrollControlled: true,
                         shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(20),
-                          ),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                         ),
                         builder: (_) => EditProfileSheet(token: widget.token),
                       ).then((_) => _loadUserProfile());
@@ -1042,16 +980,10 @@ class _HomePageState extends State<HomePage>
                   ),
                   const Divider(indent: 16, endIndent: 16),
                   ListTile(
-                    leading: const Icon(
-                      Icons.logout,
-                      color: AppColors.highlight,
-                    ),
+                    leading: const Icon(Icons.logout, color: AppColors.highlight),
                     title: const Text(
                       'Cerrar sesión',
-                      style: TextStyle(
-                        color: AppColors.highlight,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(color: AppColors.highlight, fontWeight: FontWeight.w500),
                     ),
                     onTap: () {
                       Navigator.pushAndRemoveUntil(
@@ -1077,16 +1009,10 @@ class _HomePageState extends State<HomePage>
           indicatorWeight: 3,
           labelColor: AppColors.accent,
           unselectedLabelColor: AppColors.secondary,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
             Tab(icon: Icon(Icons.pets), text: 'Mis Perros'),
-            Tab(
-              icon: Text('🐽', style: TextStyle(fontSize: 20)),
-              text: 'Escanear',
-            ),
+            Tab(icon: Text('🐽', style: TextStyle(fontSize: 20)), text: 'Escanear'),
           ],
         ),
       ),

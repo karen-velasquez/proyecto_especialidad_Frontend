@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'app_colors.dart';
-import 'dog_detector.dart';
-import 'breed_classifier.dart';
+import '../core/app_colors.dart';
+import '../services/ml/dog_detector.dart';
+import '../services/ml/breed_classifier.dart';
 
 const List<String> kRazas = [
   'Mestizo',
@@ -168,7 +168,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
       return;
     }
 
-    // Hay perro — clasificar razas
     final razas = await BreedClassifier().classify(picked.path);
     if (!mounted) return;
     setState(() {
@@ -177,7 +176,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
       _razasDetectadas = razas;
     });
 
-    // Mostrar dialog con las razas detectadas
     if (razas.isNotEmpty) {
       showDialog(
         context: context,
@@ -335,7 +333,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           const SizedBox(height: 12),
           Container(
             width: 40,
@@ -345,8 +342,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
-          // Header con gradiente
           Container(
             margin: const EdgeInsets.fromLTRB(0, 16, 0, 0),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -379,8 +374,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
               ],
             ),
           ),
-
-          // Formulario
           Flexible(
             child: SingleChildScrollView(
               padding: EdgeInsets.only(
@@ -394,7 +387,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Foto del perro
                     GestureDetector(
                       onTap: _tomarFoto,
                       child: Container(
@@ -459,7 +451,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                           label: const Text('Cambiar foto', style: TextStyle(color: AppColors.primary, fontSize: 12)),
                         ),
                       ),
-                    // Razas detectadas
                     if (_razasDetectadas.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -529,16 +520,12 @@ class _AddDogSheetState extends State<AddDogSheet> {
                       ),
                     ],
                     const SizedBox(height: 20),
-
-                    // Nombre
                     TextFormField(
                       decoration: _fieldDecoration('Nombre de la mascota', Icons.pets),
                       validator: (v) => v != null && v.isNotEmpty ? null : 'Nombre obligatorio',
                       onChanged: (v) => nombre = v,
                     ),
                     const SizedBox(height: 20),
-
-                    // Género
                     const Text(
                       'Género',
                       style: TextStyle(
@@ -578,8 +565,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                         ),
                       ),
                     const SizedBox(height: 20),
-
-                    // Edad
                     const Text(
                       'Edad',
                       style: TextStyle(
@@ -613,8 +598,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // Raza
                     const Text(
                       'Raza',
                       style: TextStyle(
@@ -648,8 +631,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Esterilizado
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(
@@ -697,8 +678,6 @@ class _AddDogSheetState extends State<AddDogSheet> {
                       ),
                     ],
                     const SizedBox(height: 28),
-
-                    // Botones
                     Row(
                       children: [
                         Expanded(
@@ -784,11 +763,7 @@ class _GenderButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: selected ? Colors.white : AppColors.primary,
-              size: 20,
-            ),
+            Icon(icon, color: selected ? Colors.white : AppColors.primary, size: 20),
             const SizedBox(width: 6),
             Text(
               label,
