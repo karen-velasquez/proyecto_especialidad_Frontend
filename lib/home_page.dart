@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'add_dog_sheet.dart';
 import 'edit_profile_sheet.dart';
+import 'login_page.dart';
 import 'app_colors.dart';
 import 'breed_classifier.dart';
 import 'dog_detector.dart';
@@ -30,11 +31,26 @@ class _HomePageState extends State<HomePage>
   List<BreedResult> _scanRazas = [];
   final _picker = ImagePicker();
 
+  Map<String, dynamic>? _userProfile;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     fetchDogs();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.0.4:3000/api/users/me'),
+        headers: widget.token != null ? {'Authorization': 'Bearer ${widget.token}'} : {},
+      );
+      if (response.statusCode == 200 && mounted) {
+        setState(() => _userProfile = jsonDecode(response.body));
+      }
+    } catch (_) {}
   }
 
   @override
@@ -443,6 +459,130 @@ class _HomePageState extends State<HomePage>
     } catch (_) {}
   }
 
+  void _showMatchDetail(Map<String, dynamic> dog, String ownerName, String matchPct) {
+    final owner = dog['owner'];
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.dark, AppColors.primary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.25),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.pets, color: AppColors.secondary, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  dog['nombre'] ?? 'Sin nombre',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  matchPct,
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Foto del perro
+              if (dog['foto'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      dog['foto'],
+                      width: double.infinity,
+                      height: 180,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              // Info del perro
+              _dogDetailRow(Icons.pets, 'Raza', dog['raza'] ?? '-'),
+              _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
+              _dogDetailRow(
+                Icons.cake,
+                'Edad',
+                '${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses',
+              ),
+              _dogDetailRow(
+                dog['esterilizado'] == true ? Icons.check_circle : Icons.cancel,
+                'Esterilizado',
+                dog['esterilizado'] == true ? 'Sí' : 'No',
+              ),
+              const Divider(height: 24),
+              // Info del dueño
+              const Row(
+                children: [
+                  Icon(Icons.person, color: AppColors.primary, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Información del dueño',
+                    style: TextStyle(
+                      color: AppColors.dark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _dogDetailRow(Icons.person_outline, 'Nombre', ownerName),
+              if (owner != null && owner['telefono'] != null)
+                _dogDetailRow(Icons.phone, 'Teléfono', owner['telefono']),
+              if (owner != null && owner['email'] != null && (owner['email'] as String).isNotEmpty)
+                _dogDetailRow(Icons.email, 'Correo', owner['email']),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _mostrarCoincidencias(BreedResult razaPrincipal, List<dynamic> dogs) {
     final pct = (razaPrincipal.confidence * 100).toStringAsFixed(1);
     showDialog(
@@ -566,6 +706,7 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                       ),
+                      onTap: () => _showMatchDetail(dog, ownerName, matchPct),
                     );
                   },
                 ),
@@ -585,32 +726,34 @@ class _HomePageState extends State<HomePage>
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         children: [
-          // Ícono principal
-          Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.secondary, width: 2),
+          // Ícono principal — se oculta cuando hay imagen o se está analizando
+          if (_scanImage == null && !_scanAnalizando) ...[
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.secondary, width: 2),
+              ),
+              child: const Text('🐽', style: TextStyle(fontSize: 64)),
             ),
-            child: const Text('🐽', style: TextStyle(fontSize: 64)),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Escanear huella nasal',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.dark,
+            const SizedBox(height: 20),
+            const Text(
+              'Escanear huella nasal',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.dark,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Toma o sube una foto de la nariz del perro',
-            style: TextStyle(color: AppColors.primary, fontSize: 13),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
+            const SizedBox(height: 6),
+            const Text(
+              'Toma o sube una foto de la nariz del perro',
+              style: TextStyle(color: AppColors.primary, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+          ],
 
           // Botones de acción
           Row(
@@ -810,21 +953,62 @@ class _HomePageState extends State<HomePage>
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.secondary, width: 2),
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      size: 36,
-                      color: Colors.white,
-                    ),
+                    child: const Icon(Icons.person, size: 36, color: Colors.white),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Mi perfil',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  if (_userProfile != null) ...[
+                    Text(
+                      '${_userProfile!['nombres'] ?? ''} ${_userProfile!['apellidos'] ?? ''}'.trim(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 6),
+                    if (_userProfile!['email'] != null && (_userProfile!['email'] as String).isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.email_outlined, color: AppColors.secondary, size: 13),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              _userProfile!['email'],
+                              style: const TextStyle(color: AppColors.secondary, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    if (_userProfile!['telefono'] != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.phone_outlined, color: AppColors.secondary, size: 13),
+                          const SizedBox(width: 5),
+                          Text(
+                            _userProfile!['telefono'],
+                            style: const TextStyle(color: AppColors.secondary, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    if (_userProfile!['fechaNacimiento'] != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.cake_outlined, color: AppColors.secondary, size: 13),
+                          const SizedBox(width: 5),
+                          Text(
+                            (_userProfile!['fechaNacimiento'] as String).substring(0, 10),
+                            style: const TextStyle(color: AppColors.secondary, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                  ] else
+                    const Text(
+                      'Mi perfil',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                 ],
               ),
             ),
@@ -853,7 +1037,7 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                         builder: (_) => EditProfileSheet(token: widget.token),
-                      );
+                      ).then((_) => _loadUserProfile());
                     },
                   ),
                   const Divider(indent: 16, endIndent: 16),
@@ -870,8 +1054,11 @@ class _HomePageState extends State<HomePage>
                       ),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
-                      // TODO: cerrar sesión
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                        (_) => false,
+                      );
                     },
                   ),
                 ],

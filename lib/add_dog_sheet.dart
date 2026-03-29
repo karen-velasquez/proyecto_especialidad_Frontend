@@ -132,9 +132,11 @@ class _AddDogSheetState extends State<AddDogSheet> {
               children: [
                 Icon(Icons.warning_amber_rounded, color: AppColors.accent, size: 22),
                 SizedBox(width: 10),
-                Text(
-                  'No se detectó un perro',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'No se detectó un perro',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
