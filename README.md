@@ -135,14 +135,17 @@ flutter pub get
 
 ### Paso 3: Configurar la URL de la API
 
-Abre el archivo [lib/login_page.dart](lib/login_page.dart) y actualiza la dirección IP con la IP de tu máquina donde corre el backend:
+Abre el archivo [lib/core/constants.dart](lib/core/constants.dart) y actualiza la dirección IP con la IP de tu máquina donde corre el backend:
 
 ```dart
-// Buscar la línea que contiene la URL base y cambiar la IP:
-final String baseUrl = 'http://TU_IP_LOCAL:3000';
+class ApiConstants {
+  static const String baseUrl = 'http://TU_IP_LOCAL:3000';
+  ...
+}
 ```
 
 > Para obtener tu IP local en Windows: ejecuta `ipconfig` en CMD y copia la dirección IPv4.
+> Este es el único archivo donde se debe cambiar la IP; todas las pantallas la usan desde aquí.
 
 ### Paso 4: Ejecutar la aplicación
 

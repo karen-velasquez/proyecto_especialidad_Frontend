@@ -1,43 +1,33 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'add_dog_sheet.dart';
-import 'edit_profile_sheet.dart';
 import 'login_page.dart';
 import '../core/app_colors.dart';
 import '../core/constants.dart';
-import '../services/ml/breed_classifier.dart';
-import '../services/ml/dog_detector.dart';
+import '../widgets/auth_widgets.dart';
+import '../widgets/home_widgets.dart';
 
 class HomePage extends StatefulWidget {
   final String? token;
-  const HomePage({Key? key, this.token}) : super(key: key);
+  final ValueChanged<int>? onDogCountChanged;
+  const HomePage({super.key, this.token, this.onDogCountChanged});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _HomePageState extends State<HomePage> {
   List<dynamic> dogs = [];
   bool isLoading = true;
   String? errorMsg;
-
-  File? _scanImage;
-  bool _scanAnalizando = false;
-  List<BreedResult> _scanRazas = [];
-  final _picker = ImagePicker();
 
   Map<String, dynamic>? _userProfile;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     fetchDogs();
     _loadUserProfile();
   }
@@ -46,7 +36,9 @@ class _HomePageState extends State<HomePage>
     try {
       final response = await http.get(
         Uri.parse('${ApiConstants.usersUrl}/me'),
-        headers: widget.token != null ? {'Authorization': 'Bearer ${widget.token}'} : {},
+        headers: widget.token != null
+            ? {'Authorization': 'Bearer ${widget.token}'}
+            : {},
       );
       if (response.statusCode == 200 && mounted) {
         setState(() => _userProfile = jsonDecode(response.body));
@@ -54,13 +46,8 @@ class _HomePageState extends State<HomePage>
     } catch (_) {}
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   void _showAddDogSheet() async {
+    HapticFeedback.selectionClick();
     final data = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -76,7 +63,8 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _registerDog(Map<String, dynamic> data) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(ApiConstants.dogsUrl));
+      final request =
+          http.MultipartRequest('POST', Uri.parse(ApiConstants.dogsUrl));
 
       if (widget.token != null) {
         request.headers['Authorization'] = 'Bearer ${widget.token}';
@@ -95,7 +83,8 @@ class _HomePageState extends State<HomePage>
         request.fields['razasDetectadas'] = jsonEncode(data['razasDetectadas']);
       }
       if (data['fotoPath'] != null) {
-        request.files.add(await http.MultipartFile.fromPath('foto', data['fotoPath']));
+        request.files
+            .add(await http.MultipartFile.fromPath('foto', data['fotoPath']));
       }
 
       final streamed = await request.send();
@@ -104,7 +93,11 @@ class _HomePageState extends State<HomePage>
       if (!mounted) return;
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perro registrado correctamente')),
+          const SnackBar(
+            content: Text('Perro registrado correctamente'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         fetchDogs();
       } else {
@@ -137,6 +130,7 @@ class _HomePageState extends State<HomePage>
           dogs = jsonDecode(response.body);
           isLoading = false;
         });
+        widget.onDogCountChanged?.call(dogs.length);
       } else {
         setState(() {
           errorMsg = 'Error: ${response.body}';
@@ -151,31 +145,47 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  void _logout() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
+  }
+
+  String get _firstName {
+    final n = _userProfile?['nombres'];
+    if (n is String && n.trim().isNotEmpty) {
+      return n.trim().split(' ').first;
+    }
+    return '';
+  }
+
+  // -------------------------------------------------------------------------
+  // Detalle de un perro propio (dark premium).
+  // -------------------------------------------------------------------------
   void _showDogDetail(Map<String, dynamic> dog) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titlePadding: EdgeInsets.zero,
         title: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.dark, AppColors.primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            gradient: AppColors.ctaGradient,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.25),
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.pets, color: AppColors.secondary, size: 22),
+                child: const Icon(Icons.pets, color: Colors.white, size: 22),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -221,29 +231,19 @@ class _HomePageState extends State<HomePage>
               'Esterilizado',
               dog['esterilizado'] == true ? 'Sí' : 'No',
             ),
-            if (dog['esterilizado'] == true && dog['codigoEsterilizacion'] != null)
+            if (dog['esterilizado'] == true &&
+                dog['codigoEsterilizacion'] != null)
               _dogDetailRow(Icons.tag, 'Código', dog['codigoEsterilizacion']),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
+            child: const Text('Cerrar',
+                style: TextStyle(color: AppColors.turquoise)),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _dogAvatarFallback() {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.pets, size: 26, color: AppColors.primary),
     );
   }
 
@@ -252,844 +252,429 @@ class _HomePageState extends State<HomePage>
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.primary),
+          Icon(icon, size: 18, color: AppColors.turquoise),
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark),
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(color: AppColors.textSecondary)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDogsTab() {
-    if (isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-    }
-    if (errorMsg != null) {
-      return Center(
-        child: Text(errorMsg!, style: const TextStyle(color: AppColors.highlight)),
-      );
-    }
-    if (dogs.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.secondary, width: 2),
-              ),
-              child: const Icon(Icons.pets, size: 48, color: AppColors.secondary),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No tienes perros registrados',
-              style: TextStyle(color: AppColors.dark, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Toca + para agregar tu primer perro',
-              style: TextStyle(color: AppColors.primary, fontSize: 13),
-            ),
-          ],
+  // =========================================================================
+  // BUILD
+  // =========================================================================
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBody: true,
+      body: AuroraBackground(
+        child: SafeArea(
+          bottom: false,
+          child: isLoading
+              ? const HomeSkeleton()
+              : RefreshIndicator(
+                  color: AppColors.turquoise,
+                  backgroundColor: AppColors.surface,
+                  onRefresh: () async {
+                    await fetchDogs();
+                    await _loadUserProfile();
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 20),
+                      FloatingHeroCard(
+                        title: 'Protege a tus mascotas con IA',
+                        description:
+                            'Registra nuevos perros y gestiona su información biométrica.',
+                        ctaLabel: 'Registrar Perro',
+                        onCta: _showAddDogSheet,
+                      ),
+                      const SizedBox(height: 26),
+                      _buildMyDogsSection(),
+                    ],
+                  ),
+                ),
         ),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: dogs.length,
-      itemBuilder: (context, index) {
-        final dog = dogs[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.dark.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: dog['foto'] != null
-                  ? Image.network(
-                      dog['foto'],
-                      width: 52,
-                      height: 52,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _dogAvatarFallback(),
-                    )
-                  : _dogAvatarFallback(),
-            ),
-            title: Text(
-              dog['nombre'] ?? 'Sin nombre',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.dark,
-                fontSize: 15,
-              ),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '${dog['raza'] ?? 'Raza desconocida'} · '
-                '${dog['edadAnios'] ?? 0}a ${dog['edadMeses'] ?? 0}m · '
-                '${dog['genero'] ?? '-'}',
-                style: const TextStyle(color: AppColors.primary, fontSize: 12),
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.secondary),
-            onTap: () => _showDogDetail(dog),
-          ),
-        );
-      },
+      ),
     );
   }
 
-  Future<void> _pickScanImage(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source, imageQuality: 90);
-    if (picked == null) return;
-
-    setState(() {
-      _scanAnalizando = true;
-      _scanImage = File(picked.path);
-      _scanRazas = [];
-    });
-
-    final detector = DogDetector();
-    bool hayPerro = false;
-    try {
-      await detector.load();
-      hayPerro = await detector.containsDog(picked.path);
-    } finally {
-      detector.dispose();
-    }
-
-    if (!mounted) return;
-
-    if (!hayPerro) {
-      setState(() {
-        _scanAnalizando = false;
-        _scanImage = null;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se detectó un perro en la imagen. Intenta de nuevo.')),
-      );
-      return;
-    }
-
-    final razas = await BreedClassifier().classify(picked.path);
-    if (!mounted) return;
-    setState(() {
-      _scanAnalizando = false;
-      _scanRazas = razas;
-    });
-
-    if (razas.isNotEmpty) {
-      await _buscarCoincidencias(razas.first);
-    }
-  }
-
-  Future<void> _buscarCoincidencias(BreedResult razaPrincipal) async {
-    try {
-      final uri = Uri.parse(
-        '${ApiConstants.dogsUrl}/search-by-breed'
-        '?raza=${Uri.encodeComponent(razaPrincipal.breed)}&minConfianza=0.6',
-      );
-      final response = await http.get(
-        uri,
-        headers: widget.token != null ? {'Authorization': 'Bearer ${widget.token}'} : {},
-      );
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        final List<dynamic> coincidencias = jsonDecode(response.body);
-        _mostrarCoincidencias(razaPrincipal, coincidencias);
-      }
-    } catch (_) {}
-  }
-
-  void _showMatchDetail(Map<String, dynamic> dog, String ownerName, String matchPct) {
-    final owner = dog['owner'];
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titlePadding: EdgeInsets.zero,
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.dark, AppColors.primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  // ---- Sección 1: Header ----
+  Widget _buildHeader() {
+    final hasName = _firstName.isNotEmpty;
+    final count = dogs.length;
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: _openProfileMenu,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppColors.brandGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.turquoise.withValues(alpha: 0.4),
+                  blurRadius: 14,
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            child: const Icon(Icons.person, color: Colors.white, size: 26),
           ),
-          child: Row(
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.25),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.pets, color: AppColors.secondary, size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  dog['nombre'] ?? 'Sin nombre',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+              Text(
+                hasName ? 'Hola, $_firstName 👋' : 'Hola 👋',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  matchPct,
-                  style: const TextStyle(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
+              const SizedBox(height: 2),
+              Text(
+                count == 0
+                    ? 'Aún no tienes mascotas registradas'
+                    : 'Tienes $count mascota${count == 1 ? '' : 's'} registrada${count == 1 ? '' : 's'}',
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
           ),
         ),
-        content: SingleChildScrollView(
+        _circleIconButton(Icons.person_outline, _openProfileMenu),
+        const SizedBox(width: 8),
+        _circleIconButton(Icons.notifications_none, () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No tienes notificaciones nuevas'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }, badge: true),
+      ],
+    );
+  }
+
+  Widget _circleIconButton(IconData icon, VoidCallback onTap,
+      {bool badge = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            ),
+            child: Icon(icon, color: AppColors.textPrimary, size: 20),
+          ),
+          if (badge)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: AppColors.turquoise,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Sección: Mis Mascotas ----
+  Widget _buildMyDogsSection() {
+    if (errorMsg != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Center(
+          child: Text(errorMsg!,
+              style: const TextStyle(color: AppColors.error)),
+        ),
+      );
+    }
+    if (dogs.isEmpty) {
+      return _buildEmptyState();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Mis Mascotas',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (int i = 0; i < dogs.length; i++)
+          StaggeredItem(
+            index: i,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _DogCard(
+                dog: dogs[i],
+                onTap: () => _showDogDetail(dogs[i]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 24),
+        child: Column(
+          children: [
+            const GlowingPawLogo(size: 90),
+            const SizedBox(height: 22),
+            const Text(
+              'Aún no registraste ninguna mascota',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Empieza registrando tu primer perro y crea su perfil biométrico.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13.5,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---- Menú de perfil (bottom sheet con acciones) ----
+  void _openProfileMenu() {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (dog['foto'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      dog['foto'],
-                      width: double.infinity,
-                      height: 180,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              _dogDetailRow(Icons.pets, 'Raza', dog['raza'] ?? '-'),
-              _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
-              _dogDetailRow(
-                Icons.cake,
-                'Edad',
-                '${dog['edadAnios'] ?? 0} años ${dog['edadMeses'] ?? 0} meses',
-              ),
-              _dogDetailRow(
-                dog['esterilizado'] == true ? Icons.check_circle : Icons.cancel,
-                'Esterilizado',
-                dog['esterilizado'] == true ? 'Sí' : 'No',
-              ),
-              const Divider(height: 24),
-              const Row(
-                children: [
-                  Icon(Icons.person, color: AppColors.primary, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'Información del dueño',
-                    style: TextStyle(
-                      color: AppColors.dark,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _dogDetailRow(Icons.person_outline, 'Nombre', ownerName),
-              if (owner != null && owner['telefono'] != null)
-                _dogDetailRow(Icons.phone, 'Teléfono', owner['telefono']),
-              if (owner != null && owner['email'] != null && (owner['email'] as String).isNotEmpty)
-                _dogDetailRow(Icons.email, 'Correo', owner['email']),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _mostrarCoincidencias(BreedResult razaPrincipal, List<dynamic> coincidencias) {
-    final pct = (razaPrincipal.confidence * 100).toStringAsFixed(1);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titlePadding: EdgeInsets.zero,
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.dark, AppColors.primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.search, color: AppColors.accent, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Coincidencias encontradas',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${razaPrincipal.breed} · $pct% de coincidencia',
-                style: const TextStyle(color: AppColors.secondary, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        content: coincidencias.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'No se encontraron perros con más del 60% de esta raza en la base de datos.',
-                  style: TextStyle(color: AppColors.dark),
-                ),
-              )
-            : SizedBox(
-                width: double.maxFinite,
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: coincidencias.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final dog = coincidencias[i];
-                    final owner = dog['owner'];
-                    final ownerName = owner != null
-                        ? '${owner['nombres'] ?? ''} ${owner['apellidos'] ?? ''}'.trim()
-                        : 'Desconocido';
-                    final razaMatch = (dog['razasDetectadas'] as List?)
-                        ?.firstWhere(
-                          (r) => r['raza'] == razaPrincipal.breed,
-                          orElse: () => null,
-                        );
-                    final matchPct = razaMatch != null
-                        ? '${((razaMatch['confianza'] as num) * 100).toStringAsFixed(1)}%'
-                        : '-';
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                      leading: dog['foto'] != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Image.network(
-                                dog['foto'],
-                                width: 46,
-                                height: 46,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _dogAvatarFallback(),
-                              ),
-                            )
-                          : _dogAvatarFallback(),
-                      title: Text(
-                        dog['nombre'] ?? 'Sin nombre',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark, fontSize: 14),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dog['raza'] ?? '-',
-                            style: const TextStyle(color: AppColors.primary, fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              const Icon(Icons.person_outline, size: 12, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  ownerName,
-                                  style: const TextStyle(color: AppColors.secondary, fontSize: 11),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          matchPct,
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      onTap: () => _showMatchDetail(dog, ownerName, matchPct),
-                    );
-                  },
-                ),
-              ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: AppColors.primary)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScanTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Column(
-        children: [
-          if (_scanImage == null && !_scanAnalizando) ...[
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.secondary, width: 2),
-              ),
-              child: const Text('🐽', style: TextStyle(fontSize: 64)),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Escanear huella nasal',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.dark),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Toma o sube una foto de la nariz del perro',
-              style: TextStyle(color: AppColors.primary, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: _ScanOptionButton(
-                  icon: Icons.camera_alt,
-                  label: 'Sacar foto',
-                  onTap: () => _pickScanImage(ImageSource.camera),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _ScanOptionButton(
-                  icon: Icons.photo_library,
-                  label: 'Subir imagen',
-                  onTap: () => _pickScanImage(ImageSource.gallery),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          if (_scanAnalizando) ...[
-            const CircularProgressIndicator(color: AppColors.primary),
-            const SizedBox(height: 12),
-            const Text(
-              'Analizando imagen...',
-              style: TextStyle(color: AppColors.primary, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-          ],
-          if (_scanImage != null && !_scanAnalizando) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.file(
-                _scanImage!,
-                width: double.infinity,
-                height: 220,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_scanRazas.isNotEmpty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.dark.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Razas detectadas',
-                          style: TextStyle(
-                            color: AppColors.dark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ..._scanRazas.map((r) {
-                      final pct = (r.confidence * 100).toStringAsFixed(1);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  r.breed,
-                                  style: const TextStyle(
-                                    color: AppColors.dark,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  '$pct%',
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: r.confidence,
-                                backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
-                                valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                                minHeight: 6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 2,
-                  ),
-                  onPressed: () => _buscarCoincidencias(_scanRazas.first),
-                  icon: const Icon(Icons.search),
-                  label: const Text(
-                    'Buscar coincidencias',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _scanImage = null;
-                    _scanRazas = [];
-                  }),
-                  icon: const Icon(Icons.delete_outline, color: AppColors.highlight, size: 18),
-                  label: const Text('Eliminar', style: TextStyle(color: AppColors.highlight)),
-                ),
-                TextButton.icon(
-                  onPressed: () => _pickScanImage(ImageSource.camera),
-                  icon: const Icon(Icons.refresh, color: AppColors.primary, size: 18),
-                  label: const Text('Cambiar', style: TextStyle(color: AppColors.primary)),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F6F5),
-      drawer: Drawer(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 52, 20, 24),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.dark, AppColors.primary],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withValues(alpha: 0.25),
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.secondary, width: 2),
+                      gradient: AppColors.brandGradient,
                     ),
-                    child: const Icon(Icons.person, size: 36, color: Colors.white),
+                    child: const Icon(Icons.person,
+                        color: Colors.white, size: 28),
                   ),
-                  const SizedBox(height: 12),
-                  if (_userProfile != null) ...[
-                    Text(
-                      '${_userProfile!['nombres'] ?? ''} ${_userProfile!['apellidos'] ?? ''}'.trim(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (_userProfile!['email'] != null && (_userProfile!['email'] as String).isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(Icons.email_outlined, color: AppColors.secondary, size: 13),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              _userProfile!['email'],
-                              style: const TextStyle(color: AppColors.secondary, fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userProfile != null
+                              ? '${_userProfile!['nombres'] ?? ''} ${_userProfile!['apellidos'] ?? ''}'
+                                  .trim()
+                              : 'Mi perfil',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
-                      ),
-                    const SizedBox(height: 4),
-                    if (_userProfile!['telefono'] != null)
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_outlined, color: AppColors.secondary, size: 13),
-                          const SizedBox(width: 5),
-                          Text(
-                            _userProfile!['telefono'],
-                            style: const TextStyle(color: AppColors.secondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 4),
-                    if (_userProfile!['fechaNacimiento'] != null)
-                      Row(
-                        children: [
-                          const Icon(Icons.cake_outlined, color: AppColors.secondary, size: 13),
-                          const SizedBox(width: 5),
-                          Text(
-                            (_userProfile!['fechaNacimiento'] as String).substring(0, 10),
-                            style: const TextStyle(color: AppColors.secondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                  ] else
-                    const Text(
-                      'Mi perfil',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  const SizedBox(height: 8),
-                  ListTile(
-                    leading: const Icon(Icons.edit, color: AppColors.primary),
-                    title: const Text(
-                      'Editar perfil',
-                      style: TextStyle(color: AppColors.dark, fontWeight: FontWeight.w500),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                         ),
-                        builder: (_) => EditProfileSheet(token: widget.token),
-                      ).then((_) => _loadUserProfile());
-                    },
-                  ),
-                  const Divider(indent: 16, endIndent: 16),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: AppColors.highlight),
-                    title: const Text(
-                      'Cerrar sesión',
-                      style: TextStyle(color: AppColors.highlight, fontWeight: FontWeight.w500),
+                        if (_userProfile?['email'] != null &&
+                            (_userProfile!['email'] as String).isNotEmpty)
+                          Text(
+                            _userProfile!['email'],
+                            style: const TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
-                    onTap: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
-                        (_) => false,
-                      );
-                    },
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              _profileTile(Icons.logout, 'Cerrar sesión', () {
+                Navigator.pop(context);
+                _logout();
+              }, danger: true),
+            ],
+          ),
         ),
       ),
-      appBar: AppBar(
-        backgroundColor: AppColors.dark,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.accent,
-          indicatorWeight: 3,
-          labelColor: AppColors.accent,
-          unselectedLabelColor: AppColors.secondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: const [
-            Tab(icon: Icon(Icons.pets), text: 'Mis Perros'),
-            Tab(icon: Text('🐽', style: TextStyle(fontSize: 20)), text: 'Escanear'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildDogsTab(), _buildScanTab()],
-      ),
-      floatingActionButton: ListenableBuilder(
-        listenable: _tabController,
-        builder: (context, _) {
-          if (_tabController.index == 0) {
-            return FloatingActionButton(
-              onPressed: _showAddDogSheet,
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              tooltip: 'Agregar perro',
-              child: const Icon(Icons.add),
-            );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
+    );
+  }
+
+  Widget _profileTile(IconData icon, String label, VoidCallback onTap,
+      {bool danger = false}) {
+    final color = danger ? AppColors.error : AppColors.textPrimary;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: danger ? AppColors.error : AppColors.turquoise),
+      title: Text(label,
+          style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      onTap: onTap,
     );
   }
 }
 
-class _ScanOptionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
+/// ---------------------------------------------------------------------------
+/// Tarjeta moderna de mascota (glass, foto grande, glow sutil).
+/// ---------------------------------------------------------------------------
+class _DogCard extends StatelessWidget {
+  final Map<String, dynamic> dog;
   final VoidCallback onTap;
-
-  const _ScanOptionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _DogCard({required this.dog, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final esterilizado = dog['esterilizado'] == true;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.dark.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: AppColors.blue.withValues(alpha: 0.10),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 28),
+            // Foto grande
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: dog['foto'] != null
+                  ? Image.network(
+                      dog['foto'],
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _fallback(),
+                    )
+                  : _fallback(),
             ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.dark,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dog['nombre'] ?? 'Sin nombre',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    dog['raza'] ?? 'Raza desconocida',
+                    style: const TextStyle(
+                        color: AppColors.turquoise, fontSize: 12.5),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _chip(
+                        '${dog['edadAnios'] ?? 0}a ${dog['edadMeses'] ?? 0}m',
+                        Icons.cake_outlined,
+                      ),
+                      _chip(dog['genero'] ?? '-', Icons.transgender),
+                      if (esterilizado)
+                        _chip('Esterilizado', Icons.check_circle,
+                            color: AppColors.success),
+                    ],
+                  ),
+                ],
               ),
             ),
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      width: 72,
+      height: 72,
+      color: AppColors.turquoise.withValues(alpha: 0.12),
+      child: const Icon(Icons.pets, size: 32, color: AppColors.turquoise),
+    );
+  }
+
+  Widget _chip(String text, IconData icon, {Color? color}) {
+    final c = color ?? AppColors.textSecondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: c),
+          const SizedBox(width: 4),
+          Text(text, style: TextStyle(color: c, fontSize: 11)),
+        ],
       ),
     );
   }
