@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('./src/app.js'\\); console.log\\('OK sintaxis'\\)\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000,8000 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id $_.OwningProcess | Select-Object Id, ProcessName, Path })",
+      "PowerShell(Stop-Process -Id 23048 -Force -ErrorAction SilentlyContinue)",
+      "Bash(uvicorn main:app --host 0.0.0.0 --port 8001)",
+      "Bash(curl -s -m 3 http://127.0.0.1:8001/health)",
+      "PowerShell(Get-Process -Id 3512)",
+      "PowerShell(Stop-Process -Id 3512 -Force)",
+      "PowerShell(Get-Process -Id 17552)",
+      "PowerShell(Stop-Process -Id 17552 -Force)",
+      "Bash(mongosh \"mongodb://localhost:27017/dog_biometric\" --quiet --eval \"db.users.getIndexes\\(\\)\")",
+      "Bash(node -e ' *)",
+      "PowerShell(Get-Process -Id 1568)",
+      "PowerShell(Stop-Process -Id 1568 -Force)"
+    ]
+  }
+}

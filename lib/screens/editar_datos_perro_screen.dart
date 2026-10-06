@@ -1,56 +1,107 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../core/app_colors.dart';
+import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/dog_form_widgets.dart';
-import '../widgets/registro_header.dart';
 import 'add_dog_sheet.dart' show kRazas;
-import 'foto_perfil_screen.dart';
 
-/// Paso 1 del registro: datos básicos del perro (nombre, género, edad, raza,
-/// esterilización). La raza es solo un dato descriptivo (ver D5) y no afecta
-/// la identificación biométrica, que ocurre en captura_trufa_screen.
-class RegistroDatosScreen extends StatefulWidget {
+/// Edita los datos descriptivos de un perro ya registrado (no toca fotos
+/// ni biometría). Mismo formulario que registro_datos_screen.dart, pero
+/// pre-poblado y guardando con PUT en vez de crear.
+class EditarDatosPerroScreen extends StatefulWidget {
   final String token;
-  const RegistroDatosScreen({super.key, required this.token});
+  final Map<String, dynamic> dog;
+  const EditarDatosPerroScreen({super.key, required this.token, required this.dog});
 
   @override
-  State<RegistroDatosScreen> createState() => _RegistroDatosScreenState();
+  State<EditarDatosPerroScreen> createState() => _EditarDatosPerroScreenState();
 }
 
-class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
+class _EditarDatosPerroScreenState extends State<EditarDatosPerroScreen> {
   final _formKey = GlobalKey<FormState>();
-  String nombre = '';
-  String? genero;
-  int edadAnios = 0;
-  int edadMeses = 0;
-  String raza = 'Mestizo';
-  bool esterilizado = false;
-  String codigoEsterilizacion = '';
+  late final TextEditingController _nombreController;
+  late String? genero;
+  late int edadAnios;
+  late int edadMeses;
+  late String raza;
+  late bool esterilizado;
+  late final TextEditingController _codigoController;
+  bool _guardando = false;
 
-  void _continuar() {
+  @override
+  void initState() {
+    super.initState();
+    _nombreController = TextEditingController(text: widget.dog['nombre'] ?? '');
+    genero = widget.dog['genero'];
+    edadAnios = widget.dog['edadAnios'] ?? 0;
+    edadMeses = widget.dog['edadMeses'] ?? 0;
+    raza = widget.dog['raza'] ?? 'Mestizo';
+    esterilizado = widget.dog['esterilizado'] == true;
+    _codigoController = TextEditingController(text: widget.dog['codigoEsterilizacion'] ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _codigoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
     if (genero == null) {
       setState(() {});
       return;
     }
     if (!_formKey.currentState!.validate()) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => FotoPerfilScreen(
-          token: widget.token,
-          datos: {
-            'nombre': nombre,
-            'genero': genero,
-            'edadAnios': edadAnios,
-            'edadMeses': edadMeses,
-            'raza': raza,
-            'esterilizado': esterilizado,
-            if (esterilizado && codigoEsterilizacion.isNotEmpty)
-              'codigoEsterilizacion': codigoEsterilizacion,
-          },
-        ),
-      ),
+
+    setState(() => _guardando = true);
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.dogsUrl}/${widget.dog['_id']}'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'nombre': _nombreController.text,
+          'genero': genero,
+          'edadAnios': edadAnios,
+          'edadMeses': edadMeses,
+          'raza': raza,
+          'esterilizado': esterilizado,
+          if (esterilizado) 'codigoEsterilizacion': _codigoController.text,
+        }),
+      );
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo conectar: $e')),
+      );
+    }
+  }
+
+  void _selectRaza() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => RazaPicker(razas: kRazas),
     );
+    if (selected != null) setState(() => raza = selected);
   }
 
   @override
@@ -60,7 +111,25 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const RegistroHeader(title: 'Datos del perro', paso: 1, total: 5),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Editar datos',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -70,6 +139,7 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         GlassInput(
+                          controller: _nombreController,
                           label: 'Nombre de la mascota',
                           icon: Icons.pets,
                           maxLength: 30,
@@ -77,7 +147,6 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
                             if (v == null || v.isEmpty) return 'Nombre obligatorio';
                             return v.trim().length >= 2 ? null : 'Mínimo 2 caracteres';
                           },
-                          onChanged: (v) => nombre = v,
                         ),
                         const SizedBox(height: 20),
                         const Text('Género',
@@ -104,12 +173,6 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
                             ),
                           ],
                         ),
-                        if (genero == null)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 6, left: 4),
-                            child: Text('Selecciona el género',
-                                style: TextStyle(color: AppColors.error, fontSize: 12)),
-                          ),
                         const SizedBox(height: 20),
                         const Text('Edad',
                             style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 13)),
@@ -176,7 +239,7 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
                                 activeThumbColor: AppColors.turquoise,
                                 onChanged: (v) => setState(() {
                                   esterilizado = v;
-                                  if (!v) codigoEsterilizacion = '';
+                                  if (!v) _codigoController.clear();
                                 }),
                               ),
                             ],
@@ -185,14 +248,19 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
                         if (esterilizado) ...[
                           const SizedBox(height: 12),
                           GlassInput(
+                            controller: _codigoController,
                             label: 'Código de esterilización',
                             icon: Icons.tag,
                             maxLength: 30,
-                            onChanged: (v) => codigoEsterilizacion = v,
                           ),
                         ],
                         const SizedBox(height: 28),
-                        GradientButton(label: 'Continuar', icon: Icons.arrow_forward, onPressed: _continuar),
+                        GradientButton(
+                          label: 'Guardar cambios',
+                          icon: Icons.check,
+                          loading: _guardando,
+                          onPressed: _guardar,
+                        ),
                       ],
                     ),
                   ),
@@ -203,16 +271,5 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
         ),
       ),
     );
-  }
-
-  void _selectRaza() async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => RazaPicker(razas: kRazas),
-    );
-    if (selected != null) setState(() => raza = selected);
   }
 }

@@ -14,30 +14,32 @@ class AuroraBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppColors.bgGradient),
-      child: Stack(
-        children: [
-          // Orbe turquesa arriba-izquierda
-          Positioned(
-            top: -120,
-            left: -100,
-            child: _GlowOrb(color: AppColors.turquoise, size: 320),
-          ),
-          // Orbe morado abajo-derecha
-          Positioned(
-            bottom: -140,
-            right: -120,
-            child: _GlowOrb(color: AppColors.purple, size: 360),
-          ),
-          // Orbe azul centro-derecha, más sutil
-          Positioned(
-            top: 220,
-            right: -80,
-            child: _GlowOrb(color: AppColors.blue, size: 220, opacity: 0.35),
-          ),
-          child,
-        ],
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.bgGradient),
+        child: Stack(
+          children: [
+            // Orbe turquesa arriba-izquierda
+            Positioned(
+              top: -120,
+              left: -100,
+              child: _GlowOrb(color: AppColors.turquoise, size: 320),
+            ),
+            // Orbe morado abajo-derecha
+            Positioned(
+              bottom: -140,
+              right: -120,
+              child: _GlowOrb(color: AppColors.purple, size: 360),
+            ),
+            // Orbe azul centro-derecha, más sutil
+            Positioned(
+              top: 220,
+              right: -80,
+              child: _GlowOrb(color: AppColors.blue, size: 220, opacity: 0.35),
+            ),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -198,6 +200,7 @@ class GlassInput extends StatefulWidget {
   final void Function(String)? onChanged;
   final bool readOnly;
   final VoidCallback? onTap;
+  final int? maxLength;
 
   const GlassInput({
     super.key,
@@ -212,6 +215,7 @@ class GlassInput extends StatefulWidget {
     this.onChanged,
     this.readOnly = false,
     this.onTap,
+    this.maxLength,
   });
 
   @override
@@ -262,9 +266,11 @@ class _GlassInputState extends State<GlassInput> {
         onChanged: widget.onChanged,
         readOnly: widget.readOnly,
         onTap: widget.onTap,
+        maxLength: widget.maxLength,
         style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
         cursorColor: AppColors.turquoise,
         decoration: InputDecoration(
+          counterText: '', // el estilo "glass" no usa el contador de caracteres visible
           labelText: widget.label,
           labelStyle: TextStyle(
             color: _focused ? AppColors.turquoise : AppColors.textSecondary,

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'captura_rostro_screen.dart';
+import 'captura_trufa_screen.dart';
+import 'editar_datos_perro_screen.dart';
 import 'login_page.dart';
 import 'registro_datos_screen.dart';
 import '../core/app_colors.dart';
 import '../core/auth_storage.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/home_widgets.dart';
 
 class HomePage extends StatefulWidget {
@@ -145,6 +149,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: const Icon(Icons.close, color: Colors.white, size: 22),
+              ),
             ],
           ),
         ),
@@ -166,6 +174,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+            _dogDetailRow(
+              Icons.info_outline,
+              'Estado',
+              _estadoMascotaLabel(dog['estadoMascota']),
+            ),
             _dogDetailRow(Icons.male, 'Género', dog['genero'] ?? '-'),
             _dogDetailRow(
               Icons.cake,
@@ -183,15 +196,209 @@ class _HomePageState extends State<HomePage> {
               _dogDetailRow(Icons.tag, 'Código', dog['codigoEsterilizacion']),
           ],
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar',
-                style: TextStyle(color: AppColors.turquoise)),
+          IconButton(
+            tooltip: 'Editar datos',
+            icon: const Icon(Icons.edit_outlined, color: AppColors.turquoise),
+            onPressed: () {
+              Navigator.pop(context);
+              _editarDatos(dog);
+            },
+          ),
+          IconButton(
+            tooltip: 'Actualizar datos biométricos',
+            icon: const Icon(Icons.fingerprint, color: AppColors.turquoise),
+            onPressed: () {
+              Navigator.pop(context);
+              _actualizarBiometria(dog);
+            },
+          ),
+          IconButton(
+            tooltip: 'Actualizar estado',
+            icon: const Icon(Icons.info_outline, color: AppColors.turquoise),
+            onPressed: () {
+              Navigator.pop(context);
+              _actualizarEstadoMascota(dog);
+            },
+          ),
+          IconButton(
+            tooltip: 'Eliminar mascota',
+            icon: const Icon(Icons.delete_outline, color: AppColors.error),
+            onPressed: () {
+              Navigator.pop(context);
+              _eliminarMascota(dog);
+            },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _editarDatos(Map<String, dynamic> dog) async {
+    if (widget.token == null) return;
+    final actualizado = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditarDatosPerroScreen(token: widget.token!, dog: dog),
+      ),
+    );
+    if (actualizado == true) fetchDogs();
+  }
+
+  Future<void> _actualizarBiometria(Map<String, dynamic> dog) async {
+    if (widget.token == null) return;
+    final confirmado = await showConfirmDialog(
+      context,
+      title: 'Actualizar datos biométricos',
+      message: 'Esto borrará las fotos de trufa y rostro actuales de '
+          '${dog['nombre'] ?? 'este perro'} y deberás volver a capturarlas. ¿Continuar?',
+      confirmLabel: 'Continuar',
+      danger: true,
+    );
+    if (!confirmado || !mounted) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/reiniciar-biometria'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (!mounted) return;
+      if (response.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${response.body}')),
+        );
+        return;
+      }
+      final dogId = dog['_id'] as String;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CapturaTrufaScreen(
+            token: widget.token!,
+            dogId: dogId,
+            onCompleto: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CapturaRostroScreen(
+                    token: widget.token!,
+                    dogId: dogId,
+                    onCompleto: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      fetchDogs();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo conectar: $e')),
+      );
+    }
+  }
+
+  String _estadoMascotaLabel(String? estado) {
+    switch (estado) {
+      case 'extraviado':
+        return 'Extraviado';
+      case 'fallecido':
+        return 'Fallecido';
+      default:
+        return 'Conmigo';
+    }
+  }
+
+  Future<void> _actualizarEstadoMascota(Map<String, dynamic> dog) async {
+    if (widget.token == null) return;
+    final nuevoEstado = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Estado de ${dog['nombre'] ?? 'la mascota'}',
+            style: const TextStyle(color: AppColors.textPrimary)),
+        children: [
+          _opcionEstado(context, 'conmigo', 'Conmigo', Icons.home_outlined, AppColors.success),
+          _opcionEstado(context, 'extraviado', 'Extraviado', Icons.error_outline, AppColors.error),
+          _opcionEstado(context, 'fallecido', 'Fallecido', Icons.favorite_border, AppColors.textSecondary),
+        ],
+      ),
+    );
+    if (nuevoEstado == null || !mounted) return;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/estado'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'estadoMascota': nuevoEstado}),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        fetchDogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar estado: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo conectar: $e')),
+      );
+    }
+  }
+
+  Widget _opcionEstado(BuildContext context, String valor, String label, IconData icon, Color color) {
+    return SimpleDialogOption(
+      onPressed: () => Navigator.pop(context, valor),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(color: AppColors.textPrimary)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _eliminarMascota(Map<String, dynamic> dog) async {
+    if (widget.token == null) return;
+    final confirmado = await showConfirmDialog(
+      context,
+      title: 'Eliminar mascota',
+      message: '¿Seguro que quieres eliminar a ${dog['nombre'] ?? 'esta mascota'}? '
+          'Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      danger: true,
+    );
+    if (!confirmado || !mounted) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        fetchDogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al eliminar: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo conectar: $e')),
+      );
+    }
   }
 
   Widget _dogDetailRow(IconData icon, String label, String value) {
@@ -238,13 +445,14 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 20),
-                      FloatingHeroCard(
-                        title: 'Protege a tus mascotas con IA',
-                        description:
-                            'Registra nuevos perros y gestiona su información biométrica.',
-                        ctaLabel: 'Registrar Perro',
-                        onCta: _showAddDogSheet,
-                      ),
+                      if (dogs.isEmpty)
+                        FloatingHeroCard(
+                          title: 'Protege a tus mascotas con IA',
+                          description:
+                              'Registra nuevos perros y gestiona su información biométrica.',
+                          ctaLabel: 'Registrar Perro',
+                          onCta: _showAddDogSheet,
+                        ),
                       const SizedBox(height: 26),
                       _buildMyDogsSection(),
                     ],
@@ -361,13 +569,19 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Mis Mascotas',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Mis Mascotas',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            _circleIconButton(Icons.add, _showAddDogSheet),
+          ],
         ),
         const SizedBox(height: 14),
         for (int i = 0; i < dogs.length; i++)
@@ -576,6 +790,12 @@ class _DogCard extends StatelessWidget {
                       if (esterilizado)
                         _chip('Esterilizado', Icons.check_circle,
                             color: AppColors.success),
+                      if (dog['estadoMascota'] == 'extraviado')
+                        _chip('Extraviado', Icons.error_outline,
+                            color: AppColors.error),
+                      if (dog['estadoMascota'] == 'fallecido')
+                        _chip('Fallecido', Icons.favorite_border,
+                            color: AppColors.textSecondary),
                     ],
                   ),
                 ],

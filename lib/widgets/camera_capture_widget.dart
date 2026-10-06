@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/app_colors.dart';
 
 /// Captura [cantidadFotos] fotos con la cámara trasera, mostrando una guía
@@ -53,6 +54,15 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
     await _controller!.initialize();
   }
 
+  Future<void> _subirDeGaleria() async {
+    final foto = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (foto == null) return;
+    setState(() => _fotos.add(foto));
+    if (_fotos.length >= widget.cantidadFotos) {
+      widget.onCompleto(List.of(_fotos));
+    }
+  }
+
   Future<void> _toggleLinterna() async {
     if (_controller == null) return;
     final nuevo = !_linternaOn;
@@ -100,6 +110,7 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
           children: [
             CameraPreview(_controller!),
             _buildOverlayCirculo(),
+            _buildBotonLinterna(),
             _buildHeader(),
             _buildMiniaturas(),
           ],
@@ -114,7 +125,7 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
         painter: _CirculoGuiaPainter(),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.only(top: 140),
+            padding: const EdgeInsets.only(top: 260),
             child: Text(
               widget.instruccion,
               textAlign: TextAlign.center,
@@ -131,38 +142,60 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
   }
 
   Widget _buildHeader() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Foto ${_fotos.length + 1} de ${widget.cantidadFotos}',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (widget.permitirLinterna)
-              IconButton(
-                icon: Icon(
-                  _linternaOn ? Icons.flash_on : Icons.flash_off,
-                  color: Colors.white,
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                onPressed: _toggleLinterna,
-              )
-            else
-              const SizedBox(width: 48),
-          ],
+                child: Text(
+                  'Foto ${_fotos.length + 1} de ${widget.cantidadFotos}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBotonLinterna() {
+    if (!widget.permitirLinterna) return const SizedBox.shrink();
+    return Positioned(
+      top: 170,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: GestureDetector(
+          onTap: _toggleLinterna,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+            ),
+            child: Icon(
+              _linternaOn ? Icons.flash_on : Icons.flash_off,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -214,25 +247,50 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
                 ),
               ),
             const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                _tomarFoto();
-              },
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.ctaGradient,
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-                child: _capturando
-                    ? const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-                      )
-                    : const Icon(Icons.camera_alt, color: Colors.white, size: 30),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _subirDeGaleria();
+                    },
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.photo_library, color: Colors.white, size: 24),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      _tomarFoto();
+                    },
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: AppColors.ctaGradient,
+                        border: Border.all(color: Colors.white, width: 3),
+                      ),
+                      child: _capturando
+                          ? const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                            )
+                          : const Icon(Icons.camera_alt, color: Colors.white, size: 30),
+                    ),
+                  ),
+                  const SizedBox(width: 52), // balancea el Row para que el botón de cámara quede centrado
+                ],
               ),
             ),
           ],

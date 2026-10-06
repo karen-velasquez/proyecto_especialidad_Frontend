@@ -145,7 +145,8 @@ class _LoginPageState extends State<LoginPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      extendBody: true,
+      backgroundColor: AppColors.bgDeep,
       body: Stack(
         children: [
           AuroraBackground(
@@ -266,27 +267,26 @@ class _LoginPageState extends State<LoginPage>
                                         color: AppColors.textSecondary,
                                         fontSize: 13),
                                   ),
-                                  const Spacer(),
-                                  Flexible(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Función de recuperación próximamente'),
-                                          behavior: SnackBarBehavior.floating,
-                                        ));
-                                      },
-                                      child: const Text(
-                                        '¿Olvidaste tu contraseña?',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            color: AppColors.turquoise,
-                                            fontSize: 13),
-                                      ),
-                                    ),
-                                  ),
                                 ],
+                              ),
+                              Align(
+                                alignment: Alignment.center,
+                                child: TextButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                      content: Text(
+                                          'Función de recuperación próximamente'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ));
+                                  },
+                                  child: const Text(
+                                    '¿Olvidaste tu contraseña?',
+                                    style: TextStyle(
+                                        color: AppColors.turquoise,
+                                        fontSize: 13),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 14),
                               GradientButton(

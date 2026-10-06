@@ -63,9 +63,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // --- Validez individual de cada campo (para los checks verdes) ---
-  bool get _nombresOk => nombres.trim().isNotEmpty;
-  bool get _apellidosOk => apellidos.trim().isNotEmpty;
-  bool get _carnetOk => carnet.trim().isNotEmpty;
+  bool get _nombresOk => nombres.trim().length >= 3;
+  bool get _apellidosOk => apellidos.trim().length >= 3;
+  bool get _carnetOk => carnet.trim().length >= 5;
   bool get _fechaOk => fechaNacimiento.isNotEmpty;
   static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
   bool get _emailOk => email.isEmpty || _emailRegex.hasMatch(email);
@@ -404,8 +404,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Nombres',
                 icon: Icons.person_outline,
                 inputFormatters: [_upperCaseFormatter],
+                maxLength: 50,
                 suffix: _check(_nombresOk),
-                validator: (v) => v != null && v.isNotEmpty ? null : 'Requerido',
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Requerido';
+                  return v.trim().length >= 3 ? null : 'Mínimo 3 caracteres';
+                },
                 onChanged: (v) => setState(() => nombres = v),
               ),
               const SizedBox(height: 14),
@@ -414,8 +418,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Apellidos',
                 icon: Icons.person_outline,
                 inputFormatters: [_upperCaseFormatter],
+                maxLength: 50,
                 suffix: _check(_apellidosOk),
-                validator: (v) => v != null && v.isNotEmpty ? null : 'Requerido',
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Requerido';
+                  return v.trim().length >= 3 ? null : 'Mínimo 3 caracteres';
+                },
                 onChanged: (v) => setState(() => apellidos = v),
               ),
               const SizedBox(height: 14),
@@ -424,8 +432,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Carnet de identidad',
                 icon: Icons.badge_outlined,
                 keyboardType: TextInputType.number,
+                maxLength: 15,
                 suffix: _check(_carnetOk),
-                validator: (v) => v != null && v.isNotEmpty ? null : 'Carnet requerido',
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Carnet requerido';
+                  return v.length >= 5 ? null : 'Mínimo 5 caracteres';
+                },
                 onChanged: (v) => setState(() => carnet = v),
               ),
               const SizedBox(height: 14),
@@ -466,6 +478,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Correo electrónico (opcional)',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
+                maxLength: 254,
                 suffix: email.isNotEmpty ? _check(_emailOk) : null,
                 validator: (v) {
                   if (v == null || v.isEmpty) return null;
@@ -516,6 +529,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Contraseña',
                 icon: Icons.lock_outline,
                 obscure: _obscurePassword,
+                maxLength: 72,
                 suffix: IconButton(
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -532,6 +546,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 label: 'Confirmar contraseña',
                 icon: Icons.lock_reset_outlined,
                 obscure: _obscureConfirm,
+                maxLength: 72,
                 suffix: _confirmOk
                     ? _check(true)
                     : IconButton(
