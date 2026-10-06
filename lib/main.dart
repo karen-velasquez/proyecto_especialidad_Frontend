@@ -6,10 +6,15 @@ import 'screens/splash_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Barra de estado translúcida con iconos claros (dark mode).
+  // Edge-to-edge: el fondo de la app se extiende detrás de la barra de
+  // navegación del sistema, en vez de dejarla negra por defecto.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Barra de estado y de navegación translúcidas con iconos claros (dark mode).
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
   ));
   runApp(const MainApp());
 }

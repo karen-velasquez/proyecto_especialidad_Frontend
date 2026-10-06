@@ -220,12 +220,10 @@ class _HomePageState extends State<HomePage> {
   // =========================================================================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: AuroraBackground(
-        child: SafeArea(
-          bottom: false,
-          child: isLoading
+    return AuroraBackground(
+      child: SafeArea(
+        bottom: false,
+        child: isLoading
               ? const HomeSkeleton()
               : RefreshIndicator(
                   color: AppColors.turquoise,
@@ -252,7 +250,6 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-        ),
       ),
     );
   }

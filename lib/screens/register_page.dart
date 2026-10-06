@@ -15,11 +15,21 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _formKey = GlobalKey<FormState>();
+  static const _totalSteps = 3;
+
+  final _pageController = PageController();
+  final _step1FormKey = GlobalKey<FormState>();
+  final _step2FormKey = GlobalKey<FormState>();
+  final _step3FormKey = GlobalKey<FormState>();
+
   final _nombresController = TextEditingController();
   final _apellidosController = TextEditingController();
+  final _carnetController = TextEditingController();
   final _fechaController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _telefonoController = TextEditingController();
 
+  int _step = 0;
   String nombres = '';
   String apellidos = '';
   String carnet = '';
@@ -42,9 +52,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _nombresController.dispose();
     _apellidosController.dispose();
+    _carnetController.dispose();
     _fechaController.dispose();
+    _emailController.dispose();
+    _telefonoController.dispose();
     super.dispose();
   }
 
@@ -53,39 +67,57 @@ class _RegisterPageState extends State<RegisterPage> {
   bool get _apellidosOk => apellidos.trim().isNotEmpty;
   bool get _carnetOk => carnet.trim().isNotEmpty;
   bool get _fechaOk => fechaNacimiento.isNotEmpty;
-  bool get _emailOk => email.isEmpty || email.contains('@');
+  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  bool get _emailOk => email.isEmpty || _emailRegex.hasMatch(email);
+
+  /// Feedback progresivo mientras se escribe el correo (null = sin problema que mostrar).
+  String? get _emailHint {
+    if (email.isEmpty) return null;
+    if (!email.contains('@')) return 'Falta el @';
+    final dominio = email.split('@').last;
+    if (dominio.isEmpty) return 'Falta el dominio, ej: gmail.com';
+    if (!dominio.contains('.')) return 'Falta la extensión, ej: .com';
+    if (dominio.endsWith('.')) return 'Completa la extensión, ej: .com';
+    if (_emailOk) return null;
+    return 'Correo inválido';
+  }
   bool get _telefonoOk => telefono.trim().length > 6; // sin verificación OTP
   bool get _passwordOk => password.length >= 6;
   bool get _confirmOk => confirmPassword.isNotEmpty && confirmPassword == password;
 
-  // Progreso del formulario (0..1) para la barra superior.
-  double get _progress {
-    final checks = [
-      _nombresOk,
-      _apellidosOk,
-      _carnetOk,
-      _fechaOk,
-      _emailOk,
-      _telefonoOk,
-      _passwordOk,
-      _confirmOk,
-    ];
-    final done = checks.where((c) => c).length;
-    return done / checks.length;
+  bool get _step1Ok => _nombresOk && _apellidosOk && _carnetOk && _fechaOk;
+  bool get _step2Ok => _emailOk && _telefonoOk;
+  bool get _canSubmit => _step1Ok && _step2Ok && _passwordOk && _confirmOk;
+
+  void _nextStep() {
+    final formKey = switch (_step) {
+      0 => _step1FormKey,
+      1 => _step2FormKey,
+      _ => _step3FormKey,
+    };
+    if (!formKey.currentState!.validate()) return;
+    if (_step == 0 && !_step1Ok) return;
+    if (_step == 1 && !_step2Ok) return;
+
+    if (_step < _totalSteps - 1) {
+      setState(() => _step++);
+      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    } else {
+      _register();
+    }
   }
 
-  bool get _canSubmit =>
-      _nombresOk &&
-      _apellidosOk &&
-      _carnetOk &&
-      _fechaOk &&
-      _emailOk &&
-      _telefonoOk &&
-      _passwordOk &&
-      _confirmOk;
+  void _previousStep() {
+    if (_step == 0) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() => _step--);
+    _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_step3FormKey.currentState!.validate()) return;
     if (!_confirmOk) {
       _showError('Las contraseñas no coinciden');
       return;
@@ -254,7 +286,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Pantalla 4: cuenta creada con éxito (confetti + acciones).
+    // Pantalla final: cuenta creada con éxito (confetti + acciones).
     if (_success) {
       return SuccessScreen(onContinue: _finishRegistration);
     }
@@ -268,14 +300,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   // Header
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new,
-                              color: AppColors.textPrimary),
-                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary),
+                          onPressed: _previousStep,
                         ),
                         const Expanded(
                           child: Text(
@@ -293,227 +323,57 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
 
+                  // Barra de progreso por pasos
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: (_step + 1) / _totalSteps),
+                        duration: const Duration(milliseconds: 300),
+                        builder: (context, value, _) => LinearProgressIndicator(
+                          value: value,
+                          minHeight: 5,
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          valueColor: const AlwaysStoppedAnimation(AppColors.turquoise),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Paso ${_step + 1} de $_totalSteps',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+
                   // Hero + título
-                  const GlowingPawLogo(size: 70),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Crea tu cuenta',
-                    style: TextStyle(
+                  const GlowingPawLogo(size: 56),
+                  const SizedBox(height: 10),
+                  Text(
+                    switch (_step) {
+                      0 => 'Información personal',
+                      1 => 'Datos de contacto',
+                      _ => 'Información de acceso',
+                    },
+                    style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      'Registra tus datos para comenzar a proteger a tu mascota.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // Card con formulario
+                  // Pasos del formulario
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(22),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Barra de progreso del formulario
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0, end: _progress),
-                                  duration: const Duration(milliseconds: 300),
-                                  builder: (context, value, _) =>
-                                      LinearProgressIndicator(
-                                    value: value,
-                                    minHeight: 5,
-                                    backgroundColor:
-                                        Colors.white.withValues(alpha: 0.08),
-                                    valueColor: const AlwaysStoppedAnimation(
-                                        AppColors.turquoise),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-
-                              _sectionTitle('Información personal'),
-
-                              // Nombres y Apellidos
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: GlassInput(
-                                      controller: _nombresController,
-                                      label: 'Nombres',
-                                      icon: Icons.person_outline,
-                                      inputFormatters: [_upperCaseFormatter],
-                                      suffix: _check(_nombresOk),
-                                      validator: (v) => v != null &&
-                                              v.isNotEmpty
-                                          ? null
-                                          : 'Requerido',
-                                      onChanged: (v) =>
-                                          setState(() => nombres = v),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: GlassInput(
-                                      controller: _apellidosController,
-                                      label: 'Apellidos',
-                                      icon: Icons.person_outline,
-                                      inputFormatters: [_upperCaseFormatter],
-                                      suffix: _check(_apellidosOk),
-                                      validator: (v) => v != null &&
-                                              v.isNotEmpty
-                                          ? null
-                                          : 'Requerido',
-                                      onChanged: (v) =>
-                                          setState(() => apellidos = v),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-
-                              GlassInput(
-                                label: 'Carnet de identidad',
-                                icon: Icons.badge_outlined,
-                                keyboardType: TextInputType.number,
-                                suffix: _check(_carnetOk),
-                                validator: (v) => v != null && v.isNotEmpty
-                                    ? null
-                                    : 'Carnet requerido',
-                                onChanged: (v) => setState(() => carnet = v),
-                              ),
-                              const SizedBox(height: 14),
-
-                              // Fecha de nacimiento
-                              GlassInput(
-                                controller: _fechaController,
-                                label: 'Fecha de nacimiento',
-                                icon: Icons.calendar_today_outlined,
-                                readOnly: true,
-                                onTap: _pickDate,
-                                suffix: _check(
-                                  _fechaOk,
-                                  otherwise: const Icon(Icons.arrow_drop_down,
-                                      color: AppColors.textSecondary),
-                                ),
-                                validator: (_) => fechaNacimiento.isNotEmpty
-                                    ? null
-                                    : 'Fecha requerida',
-                              ),
-                              const SizedBox(height: 14),
-
-                              // Correo (opcional)
-                              GlassInput(
-                                label: 'Correo electrónico (opcional)',
-                                icon: Icons.email_outlined,
-                                keyboardType: TextInputType.emailAddress,
-                                suffix: email.isNotEmpty
-                                    ? _check(_emailOk)
-                                    : null,
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return null;
-                                  return v.contains('@') ? null : 'Correo inválido';
-                                },
-                                onChanged: (v) => setState(() => email = v),
-                              ),
-                              const SizedBox(height: 14),
-
-                              // Teléfono con bandera + código país (sin OTP)
-                              IntlPhoneField(
-                                style: const TextStyle(
-                                    color: AppColors.textPrimary),
-                                dropdownTextStyle: const TextStyle(
-                                    color: AppColors.textPrimary),
-                                showCountryFlag: true,
-                                decoration: _phoneDecoration('Teléfono'),
-                                initialCountryCode: 'BO',
-                                keyboardType: TextInputType.phone,
-                                disableLengthCheck: true,
-                                onChanged: (phone) {
-                                  setState(() {
-                                    telefono = phone.completeNumber;
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 22),
-
-                              _sectionTitle('Información de acceso'),
-
-                              // Contraseña + medidor de fuerza
-                              GlassInput(
-                                label: 'Contraseña',
-                                icon: Icons.lock_outline,
-                                obscure: _obscurePassword,
-                                suffix: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  onPressed: () => setState(() =>
-                                      _obscurePassword = !_obscurePassword),
-                                ),
-                                validator: (v) => v != null && v.length >= 6
-                                    ? null
-                                    : 'Mínimo 6 caracteres',
-                                onChanged: (v) => setState(() => password = v),
-                              ),
-                              PasswordStrengthBar(
-                                strength: evaluatePassword(password),
-                              ),
-                              const SizedBox(height: 14),
-
-                              // Confirmar contraseña
-                              GlassInput(
-                                label: 'Confirmar contraseña',
-                                icon: Icons.lock_reset_outlined,
-                                obscure: _obscureConfirm,
-                                suffix: _confirmOk
-                                    ? _check(true)
-                                    : IconButton(
-                                        icon: Icon(
-                                          _obscureConfirm
-                                              ? Icons.visibility_off_outlined
-                                              : Icons.visibility_outlined,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        onPressed: () => setState(() =>
-                                            _obscureConfirm = !_obscureConfirm),
-                                      ),
-                                validator: (v) =>
-                                    v == password ? null : 'No coincide',
-                                onChanged: (v) =>
-                                    setState(() => confirmPassword = v),
-                              ),
-                              const SizedBox(height: 28),
-
-                              GradientButton(
-                                label: 'Crear cuenta',
-                                loading: isLoading,
-                                onPressed: _canSubmit ? _register : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildStep1(),
+                        _buildStep2(),
+                        _buildStep3(),
+                      ],
                     ),
                   ),
                 ],
@@ -522,9 +382,177 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
 
           // Overlay "Creando cuenta"
-          if (isLoading)
-            const Positioned.fill(child: CreatingAccountOverlay()),
+          if (isLoading) const Positioned.fill(child: CreatingAccountOverlay()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStep1() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: GlassCard(
+        padding: const EdgeInsets.all(22),
+        child: Form(
+          key: _step1FormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionTitle('Nombre y documento'),
+              GlassInput(
+                controller: _nombresController,
+                label: 'Nombres',
+                icon: Icons.person_outline,
+                inputFormatters: [_upperCaseFormatter],
+                suffix: _check(_nombresOk),
+                validator: (v) => v != null && v.isNotEmpty ? null : 'Requerido',
+                onChanged: (v) => setState(() => nombres = v),
+              ),
+              const SizedBox(height: 14),
+              GlassInput(
+                controller: _apellidosController,
+                label: 'Apellidos',
+                icon: Icons.person_outline,
+                inputFormatters: [_upperCaseFormatter],
+                suffix: _check(_apellidosOk),
+                validator: (v) => v != null && v.isNotEmpty ? null : 'Requerido',
+                onChanged: (v) => setState(() => apellidos = v),
+              ),
+              const SizedBox(height: 14),
+              GlassInput(
+                controller: _carnetController,
+                label: 'Carnet de identidad',
+                icon: Icons.badge_outlined,
+                keyboardType: TextInputType.number,
+                suffix: _check(_carnetOk),
+                validator: (v) => v != null && v.isNotEmpty ? null : 'Carnet requerido',
+                onChanged: (v) => setState(() => carnet = v),
+              ),
+              const SizedBox(height: 14),
+              GlassInput(
+                controller: _fechaController,
+                label: 'Fecha de nacimiento',
+                icon: Icons.calendar_today_outlined,
+                readOnly: true,
+                onTap: _pickDate,
+                suffix: _check(
+                  _fechaOk,
+                  otherwise: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                ),
+                validator: (_) => fechaNacimiento.isNotEmpty ? null : 'Fecha requerida',
+              ),
+              const SizedBox(height: 28),
+              GradientButton(label: 'Siguiente', icon: Icons.arrow_forward, onPressed: _nextStep),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep2() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: GlassCard(
+        padding: const EdgeInsets.all(22),
+        child: Form(
+          key: _step2FormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionTitle('Cómo contactarte'),
+              GlassInput(
+                controller: _emailController,
+                label: 'Correo electrónico (opcional)',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                suffix: email.isNotEmpty ? _check(_emailOk) : null,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return null;
+                  return _emailOk ? null : 'Correo inválido';
+                },
+                onChanged: (v) => setState(() => email = v),
+              ),
+              if (_emailHint != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Text(
+                    _emailHint!,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              IntlPhoneField(
+                controller: _telefonoController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                dropdownTextStyle: const TextStyle(color: AppColors.textPrimary),
+                showCountryFlag: true,
+                decoration: _phoneDecoration('Teléfono'),
+                initialCountryCode: 'BO',
+                keyboardType: TextInputType.phone,
+                onChanged: (phone) => setState(() => telefono = phone.completeNumber),
+              ),
+              const SizedBox(height: 28),
+              GradientButton(label: 'Siguiente', icon: Icons.arrow_forward, onPressed: _nextStep),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep3() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: GlassCard(
+        padding: const EdgeInsets.all(22),
+        child: Form(
+          key: _step3FormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionTitle('Protege tu cuenta'),
+              GlassInput(
+                label: 'Contraseña',
+                icon: Icons.lock_outline,
+                obscure: _obscurePassword,
+                suffix: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+                validator: (v) => v != null && v.length >= 6 ? null : 'Mínimo 6 caracteres',
+                onChanged: (v) => setState(() => password = v),
+              ),
+              PasswordStrengthBar(strength: evaluatePassword(password)),
+              const SizedBox(height: 14),
+              GlassInput(
+                label: 'Confirmar contraseña',
+                icon: Icons.lock_reset_outlined,
+                obscure: _obscureConfirm,
+                suffix: _confirmOk
+                    ? _check(true)
+                    : IconButton(
+                        icon: Icon(
+                          _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: AppColors.textSecondary,
+                        ),
+                        onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
+                validator: (v) => v == password ? null : 'No coincide',
+                onChanged: (v) => setState(() => confirmPassword = v),
+              ),
+              const SizedBox(height: 28),
+              GradientButton(
+                label: 'Crear cuenta',
+                loading: isLoading,
+                onPressed: _canSubmit ? _nextStep : null,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
