@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'main_shell.dart';
 import '../core/app_colors.dart';
+import '../core/auth_storage.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 
@@ -88,6 +89,7 @@ class _LoginPageState extends State<LoginPage>
         final Map<String, dynamic> data = jsonDecode(response.body);
         if (response.statusCode == 200 && data['message'] == 'Login exitoso') {
           _token = data['token'];
+          await AuthStorage.guardarToken(_token!);
           HapticFeedback.lightImpact();
           // Estado 4: login exitoso -> check animado y transición a Home.
           setState(() {
@@ -100,7 +102,7 @@ class _LoginPageState extends State<LoginPage>
             context,
             PageRouteBuilder(
               transitionDuration: const Duration(milliseconds: 500),
-              pageBuilder: (_, __, ___) => MainShell(token: _token),
+              pageBuilder: (_, __, ___) => MainShell(token: _token!),
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
             ),

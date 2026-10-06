@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'add_dog_sheet.dart';
 import 'login_page.dart';
+import 'registro_datos_screen.dart';
 import '../core/app_colors.dart';
+import '../core/auth_storage.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/home_widgets.dart';
@@ -12,7 +13,8 @@ import '../widgets/home_widgets.dart';
 class HomePage extends StatefulWidget {
   final String? token;
   final ValueChanged<int>? onDogCountChanged;
-  const HomePage({super.key, this.token, this.onDogCountChanged});
+  final VoidCallback? onHistorialTap;
+  const HomePage({super.key, this.token, this.onDogCountChanged, this.onHistorialTap});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -48,69 +50,12 @@ class _HomePageState extends State<HomePage> {
 
   void _showAddDogSheet() async {
     HapticFeedback.selectionClick();
-    final data = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const AddDogSheet(),
+    if (widget.token == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RegistroDatosScreen(token: widget.token!)),
     );
-    if (data != null) {
-      await _registerDog(data);
-    }
-  }
-
-  Future<void> _registerDog(Map<String, dynamic> data) async {
-    try {
-      final request =
-          http.MultipartRequest('POST', Uri.parse(ApiConstants.dogsUrl));
-
-      if (widget.token != null) {
-        request.headers['Authorization'] = 'Bearer ${widget.token}';
-      }
-
-      request.fields['nombre'] = data['nombre'] ?? '';
-      request.fields['genero'] = data['genero'] ?? '';
-      request.fields['edadAnios'] = data['edadAnios'].toString();
-      request.fields['edadMeses'] = data['edadMeses'].toString();
-      request.fields['raza'] = data['raza'] ?? '';
-      request.fields['esterilizado'] = data['esterilizado'].toString();
-      if (data['codigoEsterilizacion'] != null) {
-        request.fields['codigoEsterilizacion'] = data['codigoEsterilizacion'];
-      }
-      if (data['razasDetectadas'] != null) {
-        request.fields['razasDetectadas'] = jsonEncode(data['razasDetectadas']);
-      }
-      if (data['fotoPath'] != null) {
-        request.files
-            .add(await http.MultipartFile.fromPath('foto', data['fotoPath']));
-      }
-
-      final streamed = await request.send();
-      final response = await http.Response.fromStream(streamed);
-
-      if (!mounted) return;
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perro registrado correctamente'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        fetchDogs();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${response.body}')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error de conexión: $e')),
-      );
-    }
+    fetchDogs();
   }
 
   Future<void> fetchDogs() async {
@@ -145,7 +90,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _logout() {
+  void _logout() async {
+    await AuthStorage.borrarToken();
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -360,14 +307,7 @@ class _HomePageState extends State<HomePage> {
         ),
         _circleIconButton(Icons.person_outline, _openProfileMenu),
         const SizedBox(width: 8),
-        _circleIconButton(Icons.notifications_none, () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No tienes notificaciones nuevas'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }, badge: true),
+        _circleIconButton(Icons.history, widget.onHistorialTap ?? () {}),
       ],
     );
   }

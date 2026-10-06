@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/auth_storage.dart';
 import '../widgets/auth_widgets.dart';
+import 'main_shell.dart';
 import 'welcome_page.dart';
 
 /// Splash de impacto: la huella se ilumina progresivamente (~2s) y luego
@@ -31,13 +33,15 @@ class _SplashPageState extends State<SplashPage>
     );
     _c.forward();
 
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    Future.delayed(const Duration(milliseconds: 2200), () async {
+      final token = await AuthStorage.leerToken();
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 600),
-          pageBuilder: (_, __, ___) => const WelcomePage(),
+          pageBuilder: (_, __, ___) =>
+              token != null ? MainShell(token: token) : const WelcomePage(),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
         ),

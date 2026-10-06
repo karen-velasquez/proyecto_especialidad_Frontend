@@ -9,7 +9,22 @@
       "Bash(grep -r \"http\\\\|url\\\\|API\\\\|baseUrl\\\\|server\" /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/dog_biometric_frontend/lib --include=*.dart)",
       "Bash(find /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/FRONTEND/dog_biometric_api/src -type f -name *.js)",
       "Bash(find /c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL/dog_biometric_frontend/lib -maxdepth 1 -type f -name *.dart)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "Bash(cd \"c:\\\\Users\\\\Hp\\\\Desktop\\\\MAESTRIA\\\\ESPECIALIDAD\\\\PROYECTO_FINAL_ESPECIALIDAD\\\\PROYECTO_CODIGO\\\\dog_biometric_api\" && cat package.json; echo \"===STRUCTURE===\"; find . -type f -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" | head -60)",
+      "Read(//c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL_ESPECIALIDAD/PROYECTO_CODIGO/dog_biometric_api/**)",
+      "Bash(cd \"c:\\\\Users\\\\Hp\\\\Desktop\\\\MAESTRIA\\\\ESPECIALIDAD\\\\PROYECTO_FINAL_ESPECIALIDAD\\\\PROYECTO_CODIGO\\\\dog_biometric_api\" && echo \"===DOG MODEL===\"; cat src/models/dog.model.js; echo \"===DOG SERVICE===\"; cat src/services/dog.service.js; echo \"===DB===\"; cat src/db/index.js)",
+      "Read(//c/Users/Hp/Desktop/MAESTRIA/ESPECIALIDAD/PROYECTO_FINAL_ESPECIALIDAD/PROYECTO_CODIGO/**)",
+      "Bash(where python *)",
+      "Bash(python -c \"import torch, torchvision, fastapi\")",
+      "Bash(python -m pip install -r requirements.txt)",
+      "Bash(cd \"c:\\\\Users\\\\Hp\\\\Desktop\\\\MAESTRIA\\\\ESPECIALIDAD\\\\PROYECTO_FINAL_ESPECIALIDAD\\\\PROYECTO_CODIGO\\\\dog_biometric_api\" && echo \"===CONTROLLER===\"; cat src/controllers/dog.controller.js; echo \"===REPO===\"; cat src/repositories/dog.repository.js; echo \"===ROUTES===\"; cat src/routes/dog.routes.js)",
+      "Bash(python test_smoke.py)",
+      "Bash(cd \"c:\\\\Users\\\\Hp\\\\Desktop\\\\MAESTRIA\\\\ESPECIALIDAD\\\\PROYECTO_FINAL_ESPECIALIDAD\\\\PROYECTO_CODIGO\\\\dog_biometric_api\" && cat src/config/cloudinary.js)",
+      "Bash(node -e \"require\\('./src/services/dog.service'\\); require\\('./src/services/ml.service'\\); require\\('./src/controllers/dog.controller'\\); require\\('./src/models/dog.model'\\); console.log\\('OK: backend carga sin errores de sintaxis'\\)\")",
+      "Bash(python -c \"import main; print\\('OK: main.py importa sin errores'\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter devices *)"
     ]
   }
 }

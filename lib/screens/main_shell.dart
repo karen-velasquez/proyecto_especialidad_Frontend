@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'historial_screen.dart';
 import 'profile_page.dart';
 import 'scan_screen.dart';
 import '../core/app_colors.dart';
@@ -8,8 +9,8 @@ import '../widgets/bottom_nav_bar.dart';
 /// Contenedor principal tras el login. Aloja la barra inferior con 3 destinos:
 /// Inicio · (patita central = escaneo) · Perfil.
 class MainShell extends StatefulWidget {
-  final String? token;
-  const MainShell({super.key, this.token});
+  final String token;
+  const MainShell({super.key, required this.token});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -52,6 +53,10 @@ class _MainShellState extends State<MainShell> {
             onDogCountChanged: (c) {
               if (c != _dogCount) setState(() => _dogCount = c);
             },
+            onHistorialTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => HistorialScreen(token: widget.token)),
+            ),
           ),
           ProfilePage(token: widget.token, dogCount: _dogCount),
         ],

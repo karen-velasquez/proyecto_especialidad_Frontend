@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'edit_profile_sheet.dart';
-import 'login_page.dart';
 import '../core/app_colors.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 
-/// Pantalla de perfil del usuario (dark premium): datos personales,
-/// editar perfil y cerrar sesión.
+/// Pantalla de perfil del usuario (dark premium): datos personales y editar
+/// perfil. Cerrar sesión vive en el menú del header de HomePage.
 class ProfilePage extends StatefulWidget {
   final String? token;
   final int dogCount;
@@ -60,14 +59,6 @@ class _ProfilePageState extends State<ProfilePage> {
     ).then((_) => _load());
   }
 
-  void _logout() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (_) => false,
-    );
-  }
-
   String get _fullName {
     if (_profile == null) return 'Mi perfil';
     final n = '${_profile!['nombres'] ?? ''} ${_profile!['apellidos'] ?? ''}'
@@ -87,13 +78,31 @@ class _ProfilePageState extends State<ProfilePage> {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
                 children: [
-                  const Text(
-                    'Mi perfil',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Mi perfil',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _editProfile,
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                          ),
+                          child: const Icon(Icons.edit_outlined, color: AppColors.textPrimary, size: 20),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
 
@@ -173,43 +182,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Acciones
-                  GradientButton(
-                    label: 'Editar perfil',
-                    icon: Icons.edit_outlined,
-                    onPressed: _editProfile,
-                  ),
-                  const SizedBox(height: 14),
-                  GestureDetector(
-                    onTap: _logout,
-                    child: Container(
-                      height: 54,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                            color: AppColors.error.withValues(alpha: 0.4)),
-                      ),
-                      child: const Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.logout, color: AppColors.error, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Cerrar sesión',
-                              style: TextStyle(
-                                color: AppColors.error,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
       ),

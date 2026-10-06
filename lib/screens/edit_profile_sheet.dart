@@ -20,6 +20,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   final _apellidosCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _fechaCtrl = TextEditingController();
   String fechaNacimiento = '';
 
   bool isLoading = false;
@@ -47,9 +48,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         _telefonoCtrl.text = data['telefono'] ?? '';
         _emailCtrl.text = data['email'] ?? '';
         if (data['fechaNacimiento'] != null) {
-          setState(() {
-            fechaNacimiento = data['fechaNacimiento'].toString().substring(0, 10);
-          });
+          fechaNacimiento = data['fechaNacimiento'].toString().substring(0, 10);
+          _fechaCtrl.text = fechaNacimiento;
         }
       }
     } catch (_) {}
@@ -62,6 +62,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     _apellidosCtrl.dispose();
     _telefonoCtrl.dispose();
     _emailCtrl.dispose();
+    _fechaCtrl.dispose();
     super.dispose();
   }
 
@@ -224,6 +225,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _nombresCtrl,
+                                  style: const TextStyle(color: AppColors.dark),
                                   decoration: _fieldDecoration('Nombres', Icons.person),
                                   textCapitalization: TextCapitalization.characters,
                                   inputFormatters: [_upperCaseFormatter],
@@ -233,6 +235,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _apellidosCtrl,
+                                  style: const TextStyle(color: AppColors.dark),
                                   decoration: _fieldDecoration('Apellidos', Icons.person_outline),
                                   textCapitalization: TextCapitalization.characters,
                                   inputFormatters: [_upperCaseFormatter],
@@ -243,12 +246,14 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _telefonoCtrl,
+                            style: const TextStyle(color: AppColors.dark),
                             decoration: _fieldDecoration('Teléfono', Icons.phone),
                             keyboardType: TextInputType.phone,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _emailCtrl,
+                            style: const TextStyle(color: AppColors.dark),
                             decoration: _fieldDecoration('Correo electrónico (opcional)', Icons.email),
                             keyboardType: TextInputType.emailAddress,
                             validator: (v) {
@@ -287,23 +292,21 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                                   );
                                   return;
                                 }
-                                setState(() {
-                                  fechaNacimiento =
-                                      '${picked.year.toString().padLeft(4, '0')}-'
-                                      '${picked.month.toString().padLeft(2, '0')}-'
-                                      '${picked.day.toString().padLeft(2, '0')}';
-                                });
+                                fechaNacimiento =
+                                    '${picked.year.toString().padLeft(4, '0')}-'
+                                    '${picked.month.toString().padLeft(2, '0')}-'
+                                    '${picked.day.toString().padLeft(2, '0')}';
+                                setState(() => _fechaCtrl.text = fechaNacimiento);
                               }
                             },
                             child: AbsorbPointer(
                               child: TextFormField(
+                                controller: _fechaCtrl,
+                                style: const TextStyle(color: AppColors.dark),
                                 decoration: _fieldDecoration(
                                   'Fecha de nacimiento',
                                   Icons.calendar_today,
                                   suffix: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
-                                ),
-                                controller: TextEditingController(
-                                  text: fechaNacimiento.isEmpty ? '' : fechaNacimiento,
                                 ),
                               ),
                             ),
