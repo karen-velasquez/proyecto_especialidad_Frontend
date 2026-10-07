@@ -14,8 +14,6 @@ dependencies:
   http: ^1.6.0
   intl_phone_field: ^3.2.0
   image_picker: ^1.1.2
-  tflite_flutter: ^0.11.0
-  image: ^4.3.0
   camera: ^0.11.0+2
   shared_preferences: ^2.3.3
 
@@ -23,10 +21,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/models/yolov8n_float16.tflite
-    - assets/models/yolov8n-cls_float32.tflite
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon_source.png"
+  # Adaptive icon: Android recorta la combinación background+foreground a
+  # círculo (u otras formas, según el launcher) — así el logo no queda
+  # cortado al borde como con un ícono plano cuadrado.
+  adaptive_icon_background: "assets/icon_background.png"
+  adaptive_icon_foreground: "assets/icon_foreground.png"

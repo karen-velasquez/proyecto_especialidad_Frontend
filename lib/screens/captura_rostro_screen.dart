@@ -1,23 +1,34 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../core/app_colors.dart';
 import '../core/constants.dart';
 import '../widgets/camera_capture_widget.dart';
 
-/// Captura las MAX_FOTOS_ROSTRO fotos frontales de la cara y las sube en un
-/// solo request a POST /api/dogs/:id/rostro. Solo se almacenan (no generan
-/// embedding ni se usan para identificar), por eso no necesitan granularidad.
+/// Captura las MAX_FOTOS_ROSTRO fotos frontales de la cara.
+///
+/// Dos modos, exactamente uno de [dogId]/[datosDog] debe venir no-nulo:
+/// - Re-captura biométrica ([dogId]): el perro ya existe, solo se suben las
+///   fotos a POST /api/dogs/:id/rostro (comportamiento original).
+/// - Registro nuevo ([datosDog]): el perro todavía no existe. La PRIMERA foto
+///   de rostro se envía como fotoPerfil al crear el perro (POST /api/dogs),
+///   y luego se suben ambas fotos a /rostro igual que en el otro modo.
 class CapturaRostroScreen extends StatefulWidget {
   final String token;
-  final String dogId;
-  final VoidCallback onCompleto;
+  final String? dogId;
+  final Map<String, dynamic>? datosDog;
+  final void Function(String dogId) onCompleto;
 
   const CapturaRostroScreen({
     super.key,
     required this.token,
-    required this.dogId,
+    this.dogId,
+    this.datosDog,
     required this.onCompleto,
-  });
+  }) : assert(
+          (dogId == null) != (datosDog == null),
+          'Pasa exactamente uno de dogId (re-captura) o datosDog (registro nuevo)',
+        );
 
   @override
   State<CapturaRostroScreen> createState() => _CapturaRostroScreenState();
@@ -27,38 +38,63 @@ class _CapturaRostroScreenState extends State<CapturaRostroScreen> {
   bool _subiendo = false;
   String? _error;
 
-  Future<void> _subirFotos(List<String> paths) async {
+  /// Crea el perro usando la primera foto de rostro como fotoPerfil.
+  /// @returns el dogId del perro recién creado.
+  Future<String> _crearPerro(String fotoPerfilPath) async {
+    final datos = widget.datosDog!;
+    final request = http.MultipartRequest('POST', Uri.parse(ApiConstants.dogsUrl));
+    request.headers['Authorization'] = 'Bearer ${widget.token}';
+    request.fields['nombre'] = datos['nombre'] ?? '';
+    request.fields['genero'] = datos['genero'] ?? '';
+    request.fields['edadAnios'] = datos['edadAnios'].toString();
+    request.fields['edadMeses'] = datos['edadMeses'].toString();
+    request.fields['raza'] = datos['raza'] ?? '';
+    request.fields['esterilizado'] = datos['esterilizado'].toString();
+    if (datos['codigoEsterilizacion'] != null) {
+      request.fields['codigoEsterilizacion'] = datos['codigoEsterilizacion'];
+    }
+    request.files.add(await http.MultipartFile.fromPath('foto', fotoPerfilPath));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode != 201) {
+      throw Exception('Error al registrar: ${response.body}');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['dog']['_id'] as String;
+  }
+
+  Future<void> _subirFotosRostro(String dogId, List<String> paths) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConstants.dogsUrl}/$dogId/rostro'),
+    );
+    request.headers['Authorization'] = 'Bearer ${widget.token}';
+    for (final path in paths) {
+      request.files.add(await http.MultipartFile.fromPath('fotos', path));
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode != 201) {
+      throw Exception('Error al subir las fotos: ${response.body}');
+    }
+  }
+
+  Future<void> _procesarFotos(List<String> paths) async {
     setState(() {
       _subiendo = true;
       _error = null;
     });
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${ApiConstants.dogsUrl}/${widget.dogId}/rostro'),
-      );
-      request.headers['Authorization'] = 'Bearer ${widget.token}';
-      for (final path in paths) {
-        request.files.add(await http.MultipartFile.fromPath('fotos', path));
-      }
-
-      final streamed = await request.send();
-      final response = await http.Response.fromStream(streamed);
+      final dogId = widget.dogId ?? await _crearPerro(paths.first);
+      await _subirFotosRostro(dogId, paths);
       if (!mounted) return;
-
-      if (response.statusCode == 201) {
-        widget.onCompleto();
-      } else {
-        setState(() {
-          _subiendo = false;
-          _error = 'Error al subir las fotos: ${response.body}';
-        });
-      }
+      widget.onCompleto(dogId);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _subiendo = false;
-        _error = 'No se pudo conectar: $e';
+        _error = '$e'.replaceFirst('Exception: ', '');
       });
     }
   }
@@ -71,10 +107,14 @@ class _CapturaRostroScreenState extends State<CapturaRostroScreen> {
         children: [
           CameraCaptureWidget(
             cantidadFotos: BiometricConstants.maxFotosRostro,
-            instruccion: 'Estas fotos ayudarán a mejorar\n'
-                'la identificación en el futuro',
+            mostrarGuiaCirculo: false,
+            instruccion: widget.dogId == null
+                ? 'Toma 2 fotos del rostro de tu perro\n'
+                    'la primera será su foto de perfil'
+                : 'Estas fotos ayudarán a mejorar\n'
+                    'la identificación en el futuro',
             permitirLinterna: false,
-            onCompleto: (fotos) => _subirFotos(fotos.map((f) => f.path).toList()),
+            onCompleto: (fotos) => _procesarFotos(fotos.map((f) => f.path).toList()),
           ),
           if (_subiendo)
             Container(

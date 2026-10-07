@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/dog_form_widgets.dart';
 import '../widgets/registro_header.dart';
-import 'add_dog_sheet.dart' show kRazas;
-import 'foto_perfil_screen.dart';
+import 'captura_rostro_screen.dart';
+import 'captura_trufa_screen.dart';
+import 'resumen_registro_screen.dart';
 
 /// Paso 1 del registro: datos básicos del perro (nombre, género, edad, raza,
 /// esterilización). La raza es solo un dato descriptivo (ver D5) y no afecta
@@ -33,20 +35,40 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
       return;
     }
     if (!_formKey.currentState!.validate()) return;
+    final datosDog = {
+      'nombre': nombre,
+      'genero': genero,
+      'edadAnios': edadAnios,
+      'edadMeses': edadMeses,
+      'raza': raza,
+      'esterilizado': esterilizado,
+      if (esterilizado && codigoEsterilizacion.isNotEmpty)
+        'codigoEsterilizacion': codigoEsterilizacion,
+    };
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => FotoPerfilScreen(
+        builder: (_) => CapturaRostroScreen(
           token: widget.token,
-          datos: {
-            'nombre': nombre,
-            'genero': genero,
-            'edadAnios': edadAnios,
-            'edadMeses': edadMeses,
-            'raza': raza,
-            'esterilizado': esterilizado,
-            if (esterilizado && codigoEsterilizacion.isNotEmpty)
-              'codigoEsterilizacion': codigoEsterilizacion,
+          datosDog: datosDog,
+          onCompleto: (dogId) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CapturaTrufaScreen(
+                  token: widget.token,
+                  dogId: dogId,
+                  onCompleto: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ResumenRegistroScreen(nombrePerro: nombre),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
           },
         ),
       ),
@@ -60,7 +82,7 @@ class _RegistroDatosScreenState extends State<RegistroDatosScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const RegistroHeader(title: 'Datos del perro', paso: 1, total: 5),
+              const RegistroHeader(title: 'Datos del perro', paso: 1, total: 4),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),

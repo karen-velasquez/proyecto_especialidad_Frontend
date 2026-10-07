@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'edit_profile_sheet.dart';
 import '../core/app_colors.dart';
@@ -45,6 +46,115 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool _subiendoFoto = false;
+
+  void _verFotoPerfil() {
+    final foto = _profile?['foto'];
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: foto != null
+                  ? Image.network(
+                      foto,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => _fotoPlaceholder(),
+                    )
+                  : _fotoPlaceholder(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fotoPlaceholder() {
+    return Container(
+      width: 220,
+      height: 220,
+      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.brandGradient),
+      child: const Icon(Icons.person, color: Colors.white, size: 100),
+    );
+  }
+
+  Future<void> _cambiarFoto() async {
+    if (widget.token == null) return;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.turquoise),
+              title: const Text('Tomar foto', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.turquoise),
+              title: const Text('Elegir de galería', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    setState(() => _subiendoFoto = true);
+    try {
+      final request = http.MultipartRequest('PUT', Uri.parse('${ApiConstants.usersUrl}/me/foto'));
+      request.headers['Authorization'] = 'Bearer ${widget.token}';
+      request.files.add(await http.MultipartFile.fromPath('foto', picked.path));
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        await _load();
+        if (mounted) setState(() => _subiendoFoto = false);
+      } else {
+        setState(() => _subiendoFoto = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al subir la foto: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _subiendoFoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo conectar: $e')),
+      );
     }
   }
 
@@ -110,23 +220,59 @@ class _ProfilePageState extends State<ProfilePage> {
                   Center(
                     child: Column(
                       children: [
-                        Container(
-                          width: 104,
-                          height: 104,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: AppColors.brandGradient,
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    AppColors.turquoise.withValues(alpha: 0.45),
-                                blurRadius: 26,
-                                spreadRadius: 2,
+                        Stack(
+                          children: [
+                            GestureDetector(
+                              onTap: _subiendoFoto ? null : _verFotoPerfil,
+                              child: Container(
+                                width: 140,
+                                height: 140,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: AppColors.brandGradient,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.turquoise.withValues(alpha: 0.45),
+                                      blurRadius: 26,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: _subiendoFoto
+                                    ? const Center(
+                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                      )
+                                    : (_profile?['foto'] != null
+                                        ? ClipOval(
+                                            child: Image.network(
+                                              _profile!['foto'],
+                                              width: 140,
+                                              height: 140,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  const Icon(Icons.person, color: Colors.white, size: 68),
+                                            ),
+                                          )
+                                        : const Icon(Icons.person, color: Colors.white, size: 68)),
                               ),
-                            ],
-                          ),
-                          child: const Icon(Icons.person,
-                              color: Colors.white, size: 52),
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: GestureDetector(
+                                onTap: _subiendoFoto ? null : _cambiarFoto,
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.bgDeep, width: 2),
+                                  ),
+                                  child: const Icon(Icons.camera_alt, color: AppColors.turquoise, size: 26),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         Text(

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../widgets/auth_widgets.dart';
 
-/// Último paso del registro: datos, foto de perfil, trufa y rostro ya se
-/// enviaron de forma incremental en cada pantalla anterior (ver
-/// registro_datos_screen, foto_perfil_screen, captura_trufa_screen,
-/// captura_rostro_screen). Esta pantalla solo confirma que el registro
+/// Último paso del registro: datos, fotoPerfil (primera foto de rostro),
+/// rostro y trufa ya se enviaron de forma incremental en cada pantalla
+/// anterior (ver registro_datos_screen, captura_rostro_screen,
+/// captura_trufa_screen). Esta pantalla solo confirma que el registro
 /// quedó completo y vuelve al inicio.
 class ResumenRegistroScreen extends StatelessWidget {
   final String nombrePerro;

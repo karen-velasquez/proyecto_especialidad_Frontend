@@ -26,6 +26,7 @@ class CapturaTrufaScreen extends StatefulWidget {
 
 class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
   int _subidas = 0;
+  int _intentos = 0;
   bool _subiendo = false;
   String? _error;
 
@@ -50,6 +51,7 @@ class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
       if (response.statusCode == 201) {
         setState(() {
           _subidas++;
+          _intentos++;
           _subiendo = false;
         });
         if (_subidas >= BiometricConstants.minFotosTrufa) {
@@ -58,11 +60,13 @@ class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
       } else if (response.statusCode == 422) {
         final detalle = jsonDecode(response.body) as Map<String, dynamic>;
         setState(() {
+          _intentos++;
           _subiendo = false;
           _error = detalle['motivo'] ?? 'Foto rechazada, intenta de nuevo';
         });
       } else {
         setState(() {
+          _intentos++;
           _subiendo = false;
           _error = 'Error al subir la foto: ${response.body}';
         });
@@ -70,6 +74,7 @@ class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
+        _intentos++;
         _subiendo = false;
         _error = 'No se pudo conectar: $e';
       });
@@ -83,7 +88,7 @@ class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
       body: Stack(
         children: [
           CameraCaptureWidget(
-            key: ValueKey(_subidas), // reinicia el contador visual tras cada subida
+            key: ValueKey(_intentos), // recrea el widget tras cada intento (éxito o rechazo) para limpiar la miniatura
             cantidadFotos: 1,
             instruccion: 'Acerca la cámara a la nariz hasta llenar el círculo\n'
                 'Foto ${_subidas + 1} de ${BiometricConstants.minFotosTrufa}',

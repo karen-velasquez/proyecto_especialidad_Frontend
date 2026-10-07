@@ -9,13 +9,23 @@ Future<bool> showConfirmDialog(
   required String message,
   String confirmLabel = 'Confirmar',
   bool danger = false,
+  IconData? icon,
 }) async {
   final result = await showDialog<bool>(
     context: context,
     builder: (_) => AlertDialog(
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(title, style: const TextStyle(color: AppColors.textPrimary)),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: danger ? AppColors.error : AppColors.turquoise, size: 40),
+            const SizedBox(height: 12),
+          ],
+          Text(title, style: const TextStyle(color: AppColors.textPrimary)),
+        ],
+      ),
       content: Text(message, style: const TextStyle(color: AppColors.textSecondary)),
       actions: [
         TextButton(

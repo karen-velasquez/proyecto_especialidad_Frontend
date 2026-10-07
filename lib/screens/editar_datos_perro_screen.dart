@@ -5,7 +5,6 @@ import '../core/app_colors.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/dog_form_widgets.dart';
-import 'add_dog_sheet.dart' show kRazas;
 
 /// Edita los datos descriptivos de un perro ya registrado (no toca fotos
 /// ni biometría). Mismo formulario que registro_datos_screen.dart, pero

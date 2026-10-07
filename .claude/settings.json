@@ -14,7 +14,23 @@
       "Bash(mongosh \"mongodb://localhost:27017/dog_biometric\" --quiet --eval \"db.users.getIndexes\\(\\)\")",
       "Bash(node -e ' *)",
       "PowerShell(Get-Process -Id 1568)",
-      "PowerShell(Stop-Process -Id 1568 -Force)"
+      "PowerShell(Stop-Process -Id 1568 -Force)",
+      "Bash(python -c \"from PIL import Image; print\\('Pillow OK'\\)\")",
+      "Bash(python -c \"import numpy; print\\('numpy OK'\\)\")",
+      "Bash(python generate_icon.py)",
+      "Bash(find / -iname \"MaterialIcons-Regular.ttf\" 2>/dev/null | head -5)",
+      "Read(//c//**)",
+      "Bash(dart run *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\sdk\\\\platform-tools\\\\adb.exe\" uninstall com.example.dog_biometric_frontend)",
+      "Bash(python -c ' *)",
+      "Bash(grep -n 'Hola, \\\\|Tienes $count\\\\|_buildHeader' lib/screens/home_page.dart)",
+      "Bash(rm lib/services/ml/dog_detector.dart lib/services/ml/breed_classifier.dart)",
+      "Bash(rmdir lib/services/ml)",
+      "Bash(rmdir lib/services)",
+      "Bash(rm -rf assets/models)",
+      "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8001)",
+      "Bash(adb devices *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)"
     ]
   }
 }

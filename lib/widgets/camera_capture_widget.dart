@@ -18,6 +18,7 @@ class CameraCaptureWidget extends StatefulWidget {
   final String instruccion;
   final void Function(List<XFile> fotos) onCompleto;
   final bool permitirLinterna;
+  final bool mostrarGuiaCirculo;
 
   const CameraCaptureWidget({
     super.key,
@@ -25,6 +26,7 @@ class CameraCaptureWidget extends StatefulWidget {
     required this.instruccion,
     required this.onCompleto,
     this.permitirLinterna = true,
+    this.mostrarGuiaCirculo = true,
   });
 
   @override
@@ -120,24 +122,25 @@ class _CameraCaptureWidgetState extends State<CameraCaptureWidget> {
   }
 
   Widget _buildOverlayCirculo() {
-    return IgnorePointer(
-      child: CustomPaint(
-        painter: _CirculoGuiaPainter(),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 260),
-            child: Text(
-              widget.instruccion,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                shadows: [Shadow(color: Colors.black, blurRadius: 8)],
-              ),
-            ),
-          ),
+    final texto = Padding(
+      padding: const EdgeInsets.only(top: 260),
+      child: Text(
+        widget.instruccion,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          shadows: [Shadow(color: Colors.black, blurRadius: 8)],
         ),
       ),
+    );
+    return IgnorePointer(
+      child: widget.mostrarGuiaCirculo
+          ? CustomPaint(
+              painter: _CirculoGuiaPainter(),
+              child: Center(child: texto),
+            )
+          : Center(child: texto),
     );
   }
 
