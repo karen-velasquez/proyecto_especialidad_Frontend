@@ -50,6 +50,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => ContactoDuenoScreen(
+              token: widget.token,
               nombrePerro: candidato['nombre'] ?? 'este perro',
               contacto: data['contacto'] as Map<String, dynamic>,
             ),
@@ -64,7 +65,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
       if (!mounted) return;
       setState(() => _confirmando = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     }
   }
@@ -153,6 +154,10 @@ class _CandidatoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final similitud = (candidato['similitud'] as num?)?.toDouble() ?? 0;
     final pct = (similitud * 100).clamp(0, 100).toStringAsFixed(1);
+    final similitudCara = (candidato['similitudCara'] as num?)?.toDouble();
+    final pctCara = similitudCara == null
+        ? null
+        : (similitudCara * 100).clamp(0, 100).toStringAsFixed(1);
     return GlassCard(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -184,16 +189,34 @@ class _CandidatoCard extends StatelessWidget {
                   style: const TextStyle(color: AppColors.turquoise, fontSize: 12.5),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.turquoise.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$pct% de similitud',
-                    style: const TextStyle(color: AppColors.turquoise, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.turquoise.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '$pct% trufa',
+                        style: const TextStyle(color: AppColors.turquoise, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (pctCara != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$pctCara% cara',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),

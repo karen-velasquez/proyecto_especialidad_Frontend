@@ -87,18 +87,29 @@ class _EditarDatosPerroScreenState extends State<EditarDatosPerroScreen> {
       if (!mounted) return;
       setState(() => _guardando = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     }
   }
 
   void _selectRaza() async {
+    List<String> razas;
+    try {
+      razas = await fetchRazas(widget.token);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e'.replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
+    if (!mounted) return;
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => RazaPicker(razas: kRazas),
+      builder: (_) => RazaPicker(razas: razas),
     );
     if (selected != null) setState(() => raza = selected);
   }

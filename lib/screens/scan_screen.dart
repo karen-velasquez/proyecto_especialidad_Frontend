@@ -7,9 +7,10 @@ import '../widgets/camera_capture_widget.dart';
 import 'resultados_screen.dart';
 import 'sin_coincidencia_screen.dart';
 
-/// Pantalla de identificación: toma 1 foto de trufa y la envía a
-/// POST /api/identify. El backend devuelve hasta TOP_K candidatos (sin datos
-/// de dueño); el usuario confirma manualmente en ResultadosScreen.
+/// Pantalla de identificación: toma primero 1 foto de cara y luego 1 foto de
+/// trufa, y las envía juntas a POST /api/identify. El backend devuelve hasta
+/// TOP_K candidatos con similitud de trufa (decide el ranking, ver D1) y,
+/// cuando hay match facial disponible, similitud de cara (solo informativa).
 class ScanScreen extends StatefulWidget {
   final String token;
   const ScanScreen({super.key, required this.token});
@@ -21,6 +22,7 @@ class ScanScreen extends StatefulWidget {
 class _ScanScreenState extends State<ScanScreen> {
   bool _identificando = false;
   String? _error;
+  String? _fotoCaraPath;
   final Stopwatch _stopwatch = Stopwatch();
 
   Future<void> _identificar(String path) async {
@@ -35,6 +37,9 @@ class _ScanScreenState extends State<ScanScreen> {
       final request = http.MultipartRequest('POST', Uri.parse(ApiConstants.identifyUrl));
       request.headers['Authorization'] = 'Bearer ${widget.token}';
       request.files.add(await http.MultipartFile.fromPath('foto', path));
+      if (_fotoCaraPath != null) {
+        request.files.add(await http.MultipartFile.fromPath('fotoCara', _fotoCaraPath!));
+      }
 
       final streamed = await request.send();
       final response = await http.Response.fromStream(streamed);
@@ -83,7 +88,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (!mounted) return;
       setState(() {
         _identificando = false;
-        _error = 'No se pudo conectar: $e';
+        _error = mensajeDeError(e);
       });
     }
   }
@@ -94,12 +99,20 @@ class _ScanScreenState extends State<ScanScreen> {
       backgroundColor: AppColors.bgDeep,
       body: Stack(
         children: [
-          CameraCaptureWidget(
-            key: const ValueKey('scan'),
-            cantidadFotos: 1,
-            instruccion: 'Acerca la cámara a la nariz hasta llenar el círculo',
-            onCompleto: (fotos) => _identificar(fotos.first.path),
-          ),
+          if (_fotoCaraPath == null)
+            CameraCaptureWidget(
+              key: const ValueKey('scan-cara'),
+              cantidadFotos: 1,
+              instruccion: 'Toma una foto de la cara de la mascota',
+              onCompleto: (fotos) => setState(() => _fotoCaraPath = fotos.first.path),
+            )
+          else
+            CameraCaptureWidget(
+              key: const ValueKey('scan-trufa'),
+              cantidadFotos: 1,
+              instruccion: 'Acerca la cámara a la nariz hasta llenar el círculo',
+              onCompleto: (fotos) => _identificar(fotos.first.path),
+            ),
           if (_identificando)
             Container(
               color: Colors.black.withValues(alpha: 0.6),

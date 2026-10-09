@@ -2,23 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'busqueda_esterilizacion_screen.dart';
 import 'captura_rostro_screen.dart';
 import 'captura_trufa_screen.dart';
 import 'editar_datos_perro_screen.dart';
 import 'login_page.dart';
+import 'notificaciones_screen.dart';
 import 'registro_datos_screen.dart';
 import '../core/app_colors.dart';
 import '../core/auth_storage.dart';
 import '../core/constants.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/extravio_form_dialog.dart';
 import '../widgets/home_widgets.dart';
 
 class HomePage extends StatefulWidget {
   final String? token;
   final ValueChanged<int>? onDogCountChanged;
   final VoidCallback? onHistorialTap;
-  const HomePage({super.key, this.token, this.onDogCountChanged, this.onHistorialTap});
+  final VoidCallback? onVerPerfilTap;
+  const HomePage({
+    super.key,
+    this.token,
+    this.onDogCountChanged,
+    this.onHistorialTap,
+    this.onVerPerfilTap,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -32,6 +42,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Map<String, dynamic>? _userProfile;
   late final TabController _tabController;
   static const _estadosTabs = ['conmigo', 'extraviado', 'fallecido'];
+  int _notificacionesNoLeidas = 0;
 
   @override
   void initState() {
@@ -42,6 +53,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     });
     fetchDogs();
     _loadUserProfile();
+    _cargarNotificacionesNoLeidas();
+  }
+
+  Future<void> _cargarNotificacionesNoLeidas() async {
+    if (widget.token == null) return;
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.notificacionesUrl}/no-leidas'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (!mounted || response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      setState(() => _notificacionesNoLeidas = data['count'] ?? 0);
+    } catch (_) {
+      // Si falla, simplemente no se muestra el badge; no bloquea el resto del Home.
+    }
   }
 
   @override
@@ -199,6 +226,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ),
               GestureDetector(
+                // El modal se cierra dentro del método, solo si confirma.
+                onTap: () => _eliminarMascota(dog),
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                ),
+              ),
+              GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: const Icon(Icons.close, color: Colors.white, size: 22),
               ),
@@ -250,42 +285,51 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         actions: [
-          if (dog['estadoMascota'] != 'fallecido') ...[
-            IconButton(
-              tooltip: 'Editar datos',
-              icon: const Icon(Icons.edit_outlined, color: AppColors.turquoise),
-              onPressed: () {
-                Navigator.pop(context);
-                _editarDatos(dog);
-              },
-            ),
-            // No disponible mientras el perro está extraviado: no hay cómo
-            // volver a fotografiarlo. "Encontrado" ya está contigo de nuevo.
-            if (dog['estadoMascota'] != 'extraviado')
-              IconButton(
-                tooltip: 'Actualizar datos biométricos',
-                icon: const Icon(Icons.fingerprint, color: AppColors.turquoise),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _actualizarBiometria(dog);
-                },
-              ),
-            IconButton(
-              tooltip: 'Actualizar estado',
-              icon: const Icon(Icons.info_outline, color: AppColors.turquoise),
-              onPressed: () {
-                Navigator.pop(context);
-                _actualizarEstadoMascota(dog);
-              },
-            ),
-          ],
-          IconButton(
-            tooltip: 'Eliminar mascota',
-            icon: const Icon(Icons.delete_outline, color: AppColors.error),
-            onPressed: () {
-              Navigator.pop(context);
-              _eliminarMascota(dog);
-            },
+          // Wrap (no el Row por defecto de `actions`): si los iconos no entran
+          // en una sola fila, bajan a otra en vez de desbordar el diálogo.
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              if (dog['estadoMascota'] != 'fallecido') ...[
+                IconButton(
+                  tooltip: 'Editar datos',
+                  icon: const Icon(Icons.edit_outlined, color: AppColors.turquoise),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _editarDatos(dog);
+                  },
+                ),
+                // No disponibles mientras el perro está extraviado: no hay cómo
+                // volver a fotografiarlo. "Encontrado" ya está contigo de nuevo.
+                // Estos no cierran el modal aquí: lo hacen dentro del método,
+                // solo si el usuario confirma (al cancelar, el detalle sigue abierto).
+                if (dog['estadoMascota'] != 'extraviado') ...[
+                  IconButton(
+                    tooltip: 'Actualizar fotos de la cara',
+                    icon: const Icon(Icons.pets, color: AppColors.turquoise),
+                    onPressed: () => _actualizarRostro(dog),
+                  ),
+                  IconButton(
+                    tooltip: 'Actualizar fotos de la nariz',
+                    icon: const Icon(Icons.fingerprint, color: AppColors.turquoise),
+                    onPressed: () => _actualizarTrufa(dog),
+                  ),
+                ],
+                IconButton(
+                  tooltip: 'Actualizar estado',
+                  icon: const Icon(Icons.info_outline, color: AppColors.turquoise),
+                  onPressed: () => _actualizarEstadoMascota(dog),
+                ),
+                if (dog['estadoMascota'] == 'extraviado')
+                  IconButton(
+                    tooltip: 'Editar datos del extravío',
+                    icon: const Icon(Icons.edit_location_alt_outlined, color: AppColors.turquoise),
+                    onPressed: () => _editarExtravio(dog),
+                  ),
+              ],
+            ],
           ),
         ],
       ),
@@ -303,22 +347,67 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (actualizado == true) fetchDogs();
   }
 
-  Future<void> _actualizarBiometria(Map<String, dynamic> dog) async {
+  /// Reinicia solo las fotos de trufa y las vuelve a capturar.
+  Future<void> _actualizarTrufa(Map<String, dynamic> dog) async {
+    await _reiniciarYCapturar(
+      dog,
+      tipo: 'trufa',
+      titulo: 'Actualizar fotos de la nariz',
+      mensaje: 'Esto borrará las fotos de trufa actuales de '
+          '${dog['nombre'] ?? 'este perro'} y deberás volver a capturarlas. ¿Continuar?',
+      icono: Icons.fingerprint,
+      construirPantalla: (dogId) => CapturaTrufaScreen(
+        token: widget.token!,
+        dogId: dogId,
+        onCompleto: () => Navigator.of(context).popUntil((r) => r.isFirst),
+      ),
+    );
+  }
+
+  /// Reinicia solo las fotos de rostro y las vuelve a capturar.
+  Future<void> _actualizarRostro(Map<String, dynamic> dog) async {
+    await _reiniciarYCapturar(
+      dog,
+      tipo: 'rostro',
+      titulo: 'Actualizar fotos de la cara',
+      mensaje: 'Esto borrará las fotos de rostro actuales de '
+          '${dog['nombre'] ?? 'este perro'} y deberás volver a capturarlas. ¿Continuar?',
+      icono: Icons.pets,
+      construirPantalla: (dogId) => CapturaRostroScreen(
+        token: widget.token!,
+        dogId: dogId,
+        onCompleto: (_) => Navigator.of(context).popUntil((r) => r.isFirst),
+      ),
+    );
+  }
+
+  /// Confirma, borra en el backend solo la modalidad indicada, y abre la
+  /// pantalla de captura correspondiente.
+  Future<void> _reiniciarYCapturar(
+    Map<String, dynamic> dog, {
+    required String tipo,
+    required String titulo,
+    required String mensaje,
+    required IconData icono,
+    required Widget Function(String dogId) construirPantalla,
+  }) async {
     if (widget.token == null) return;
     final confirmado = await showConfirmDialog(
       context,
-      title: 'Actualizar datos biométricos',
-      message: 'Esto borrará las fotos de trufa y rostro actuales de '
-          '${dog['nombre'] ?? 'este perro'} y deberás volver a capturarlas. ¿Continuar?',
+      title: titulo,
+      message: mensaje,
       confirmLabel: 'Continuar',
       danger: true,
-      icon: Icons.fingerprint,
+      icon: icono,
     );
     if (!confirmado || !mounted) return;
+    // Recién ahora se cierra el detalle del perro: si hubiera cancelado,
+    // el modal sigue abierto para elegir otra opción.
+    Navigator.pop(context);
 
     try {
       final response = await http.post(
-        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/reiniciar-biometria'),
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/reiniciar-biometria?tipo=$tipo'),
         headers: {'Authorization': 'Bearer ${widget.token}'},
       );
       if (!mounted) return;
@@ -328,33 +417,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         );
         return;
       }
-      final dogId = dog['_id'] as String;
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => CapturaTrufaScreen(
-            token: widget.token!,
-            dogId: dogId,
-            onCompleto: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CapturaRostroScreen(
-                    token: widget.token!,
-                    dogId: dogId,
-                    onCompleto: (_) => Navigator.of(context).popUntil((r) => r.isFirst),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => construirPantalla(dog['_id'] as String)),
       );
       fetchDogs();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     }
   }
@@ -394,6 +465,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         _opcionEstado(context, 'encontrado', 'Encontrada', Icons.home_outlined, AppColors.success),
         _opcionEstado(context, 'fallecido', 'Fallecido', Icons.favorite_border, AppColors.textSecondary),
       ] else if (estadoActual == 'encontrado') ...[
+        _opcionEstado(context, 'extraviado', 'Extraviado', Icons.error_outline, AppColors.error),
         _opcionEstado(context, 'fallecido', 'Fallecido', Icons.favorite_border, AppColors.textSecondary),
       ],
     ];
@@ -430,7 +502,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
     if (nuevoEstado == null || !mounted) return;
 
+    DatosExtravio? datosExtravio;
     if (nuevoEstado == 'extraviado') {
+      if (widget.token == null) return;
+      datosExtravio = await showExtravioFormDialog(context, token: widget.token!);
+      if (datosExtravio == null || !mounted) return;
+
       final confirmado = await showConfirmDialog(
         context,
         title: 'Marcar como extraviado',
@@ -458,6 +535,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if (!confirmado || !mounted) return;
     }
 
+    // Recién aquí se cierra el detalle del perro: si hubiera cancelado en
+    // cualquiera de los diálogos anteriores, sigue abierto para elegir otra opción.
+    Navigator.pop(context);
+
     try {
       final response = await http.patch(
         Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/estado'),
@@ -465,20 +546,88 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           'Authorization': 'Bearer ${widget.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'estadoMascota': nuevoEstado}),
+        body: jsonEncode({
+          'estadoMascota': nuevoEstado,
+          if (datosExtravio != null) ...datosExtravio.toJson(),
+        }),
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
         fetchDogs();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar estado: ${response.body}')),
+          SnackBar(content: Text(mensajeDeRespuesta(response))),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
+        SnackBar(content: Text(mensajeDeError(e))),
+      );
+    }
+  }
+
+  Future<void> _editarExtravio(Map<String, dynamic> dog) async {
+    if (widget.token == null) return;
+    Navigator.pop(context); // cierra el detalle del perro
+
+    Map<String, dynamic>? vigente;
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/extravio-vigente'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        vigente = body is Map<String, dynamic> ? body : null;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeDeError(e))),
+      );
+      return;
+    }
+
+    if (vigente == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este perro no tiene datos de extravío para editar')),
+      );
+      return;
+    }
+
+    final datos = await showExtravioFormDialog(
+      context,
+      token: widget.token!,
+      extravioExistente: vigente,
+    );
+    if (datos == null || !mounted) return;
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.dogsUrl}/${dog['_id']}/extravio-vigente'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(datos.toJson()),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Datos del extravío actualizados')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(mensajeDeRespuesta(response))),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     }
   }
@@ -508,6 +657,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       icon: Icons.delete_outline,
     );
     if (!confirmado || !mounted) return;
+    Navigator.pop(context); // cierra el detalle solo tras confirmar
 
     try {
       final response = await http.delete(
@@ -525,7 +675,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     }
   }
@@ -650,9 +800,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
           ),
         ),
-        _circleIconButton(Icons.person_outline, _openProfileMenu),
-        const SizedBox(width: 8),
-        _circleIconButton(Icons.history, widget.onHistorialTap ?? () {}),
+        _circleIconButton(Icons.more_vert, _openProfileMenu,
+            badge: _notificacionesNoLeidas > 0),
       ],
     );
   }
@@ -821,6 +970,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   // ---- Menú de perfil (bottom sheet con acciones) ----
   void _openProfileMenu() {
     HapticFeedback.selectionClick();
+    _loadUserProfile(); // refresca la foto/datos por si se editaron en ProfilePage
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -834,48 +984,100 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.brandGradient,
+              GestureDetector(
+                onTap: widget.onVerPerfilTap == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        widget.onVerPerfilTap!();
+                      },
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: AppColors.brandGradient,
+                      ),
+                      child: ClipOval(
+                        child: _userProfile?['foto'] != null
+                            ? Image.network(
+                                _userProfile!['foto'],
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.person, color: Colors.white, size: 28),
+                              )
+                            : const Icon(Icons.person, color: Colors.white, size: 28),
+                      ),
                     ),
-                    child: const Icon(Icons.person,
-                        color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _userProfile != null
-                              ? '${_userProfile!['nombres'] ?? ''} ${_userProfile!['apellidos'] ?? ''}'
-                                  .trim()
-                              : 'Mi perfil',
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (_userProfile?['email'] != null &&
-                            (_userProfile!['email'] as String).isNotEmpty)
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            _userProfile!['email'],
+                            _userProfile != null
+                                ? '${_userProfile!['nombres'] ?? ''} ${_userProfile!['apellidos'] ?? ''}'
+                                    .trim()
+                                : 'Mi perfil',
                             style: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
+                              color: AppColors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                      ],
+                          if (_userProfile?['email'] != null &&
+                              (_userProfile!['email'] as String).isNotEmpty)
+                            Text(
+                              _userProfile!['email'],
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    if (widget.onVerPerfilTap != null)
+                      const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                  ],
+                ),
               ),
               const SizedBox(height: 20),
+              if (widget.onHistorialTap != null)
+                _profileTile(Icons.history, 'Historial de identificaciones', () {
+                  Navigator.pop(context);
+                  widget.onHistorialTap!();
+                }),
+              _profileTile(
+                Icons.notifications_outlined,
+                'Notificaciones',
+                () async {
+                  Navigator.pop(context);
+                  if (widget.token == null) return;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificacionesScreen(token: widget.token!),
+                    ),
+                  );
+                  _cargarNotificacionesNoLeidas();
+                },
+                badgeCount: _notificacionesNoLeidas,
+              ),
+              _profileTile(Icons.tag, 'Búsqueda por esterilización', () {
+                Navigator.pop(context);
+                if (widget.token != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BusquedaEsterilizacionScreen(token: widget.token!),
+                    ),
+                  );
+                }
+              }),
               _profileTile(Icons.logout, 'Cerrar sesión', () {
                 Navigator.pop(context);
                 _logout();
@@ -888,14 +1090,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _profileTile(IconData icon, String label, VoidCallback onTap,
-      {bool danger = false}) {
+      {bool danger = false, int badgeCount = 0}) {
     final color = danger ? AppColors.error : AppColors.textPrimary;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: danger ? AppColors.error : AppColors.turquoise),
       title: Text(label,
           style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      trailing: badgeCount > 0 ? _countBadge(badgeCount) : null,
       onTap: onTap,
+    );
+  }
+
+  Widget _countBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      constraints: const BoxConstraints(minWidth: 22),
+      decoration: const BoxDecoration(
+        color: AppColors.error,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }
@@ -957,7 +1176,7 @@ class _DogCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    dog['raza'] ?? 'Raza desconocida',
+                    dog['raza'] ?? 'Mestizo',
                     style: const TextStyle(
                         color: AppColors.turquoise, fontSize: 12.5),
                     overflow: TextOverflow.ellipsis,
@@ -967,14 +1186,19 @@ class _DogCard extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      _chip(
-                        '${dog['edadAnios'] ?? 0}a ${dog['edadMeses'] ?? 0}m',
-                        Icons.cake_outlined,
-                      ),
-                      _chip(dog['genero'] ?? '-', Icons.transgender),
                       if (esterilizado)
                         _chip('Esterilizado', Icons.check_circle,
                             color: AppColors.success),
+                      _chip(
+                        'Fotos de cara',
+                        Icons.face_outlined,
+                        color: _rostroCompleto(dog) ? AppColors.success : AppColors.error,
+                      ),
+                      _chip(
+                        'Fotos de nariz',
+                        Icons.fingerprint,
+                        color: _trufaCompleta(dog) ? AppColors.success : AppColors.error,
+                      ),
                       if (dog['estadoMascota'] == 'extraviado')
                         _chip('Extraviado', Icons.error_outline,
                             color: AppColors.error),
@@ -1003,6 +1227,16 @@ class _DogCard extends StatelessWidget {
       color: AppColors.turquoise.withValues(alpha: 0.12),
       child: const Icon(Icons.pets, size: 32, color: AppColors.turquoise),
     );
+  }
+
+  bool _rostroCompleto(Map<String, dynamic> dog) {
+    final rostro = dog['rostro'] as List?;
+    return (rostro?.length ?? 0) >= BiometricConstants.maxFotosRostro;
+  }
+
+  bool _trufaCompleta(Map<String, dynamic> dog) {
+    final trufa = dog['trufa'] as List?;
+    return (trufa?.length ?? 0) >= BiometricConstants.minFotosTrufa;
   }
 
   Widget _chip(String text, IconData icon, {Color? color}) {

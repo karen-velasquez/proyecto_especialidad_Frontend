@@ -76,7 +76,7 @@ class _CapturaTrufaScreenState extends State<CapturaTrufaScreen> {
       setState(() {
         _intentos++;
         _subiendo = false;
-        _error = 'No se pudo conectar: $e';
+        _error = mensajeDeError(e);
       });
     }
   }

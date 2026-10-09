@@ -26,10 +26,53 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   bool isLoading = false;
   bool isFetchingProfile = true;
 
+  List<Map<String, dynamic>> _paises = [];
+  List<Map<String, dynamic>> _departamentos = [];
+  List<Map<String, dynamic>> _localidades = [];
+  String? _paisId;
+  String? _departamentoId;
+  String? _localidadId;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadPaises();
+  }
+
+  Future<void> _loadPaises() async {
+    if (widget.token == null) return;
+    try {
+      final paises = await fetchPaises(widget.token!);
+      if (!mounted) return;
+      setState(() => _paises = paises);
+    } catch (_) {
+      // Si falla, el selector de ubicación simplemente queda vacío.
+    }
+  }
+
+  Future<void> _loadDepartamentos(String paisId, {String? seleccionarId}) async {
+    if (widget.token == null) return;
+    try {
+      final departamentos = await fetchDepartamentos(widget.token!, paisId);
+      if (!mounted) return;
+      setState(() {
+        _departamentos = departamentos;
+        _departamentoId = seleccionarId;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadLocalidades(String departamentoId, {String? seleccionarId}) async {
+    if (widget.token == null) return;
+    try {
+      final localidades = await fetchLocalidades(widget.token!, departamentoId);
+      if (!mounted) return;
+      setState(() {
+        _localidades = localidades;
+        _localidadId = seleccionarId;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
@@ -50,6 +93,14 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         if (data['fechaNacimiento'] != null) {
           fechaNacimiento = data['fechaNacimiento'].toString().substring(0, 10);
           _fechaCtrl.text = fechaNacimiento;
+        }
+        final localidad = data['localidad'] as Map<String, dynamic>?;
+        final departamento = localidad?['departamento'] as Map<String, dynamic>?;
+        final pais = departamento?['pais'] as Map<String, dynamic>?;
+        if (pais != null) {
+          _paisId = pais['_id'];
+          await _loadDepartamentos(pais['_id'], seleccionarId: departamento!['_id']);
+          await _loadLocalidades(departamento['_id'], seleccionarId: localidad!['_id']);
         }
       }
     } catch (_) {}
@@ -75,6 +126,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     if (_telefonoCtrl.text.isNotEmpty) body['telefono'] = _telefonoCtrl.text;
     if (_emailCtrl.text.isNotEmpty) body['email'] = _emailCtrl.text;
     if (fechaNacimiento.isNotEmpty) body['fechaNacimiento'] = fechaNacimiento;
+    if (_localidadId != null) body['localidad'] = _localidadId;
 
     if (body.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -310,6 +362,70 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                                 ),
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Ubicación',
+                            style: const TextStyle(
+                              color: AppColors.dark,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            initialValue: _paisId,
+                            style: const TextStyle(color: AppColors.dark),
+                            decoration: _fieldDecoration('País', Icons.public),
+                            items: [
+                              for (final p in _paises)
+                                DropdownMenuItem(value: p['_id'] as String, child: Text(p['nombre'])),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() {
+                                _paisId = value;
+                                _departamentos = [];
+                                _localidades = [];
+                                _departamentoId = null;
+                                _localidadId = null;
+                              });
+                              _loadDepartamentos(value);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            initialValue: _departamentoId,
+                            style: const TextStyle(color: AppColors.dark),
+                            decoration: _fieldDecoration('Departamento', Icons.map_outlined),
+                            items: [
+                              for (final d in _departamentos)
+                                DropdownMenuItem(value: d['_id'] as String, child: Text(d['nombre'])),
+                            ],
+                            onChanged: _departamentos.isEmpty
+                                ? null
+                                : (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _departamentoId = value;
+                                      _localidades = [];
+                                      _localidadId = null;
+                                    });
+                                    _loadLocalidades(value);
+                                  },
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            initialValue: _localidadId,
+                            style: const TextStyle(color: AppColors.dark),
+                            decoration: _fieldDecoration('Localidad', Icons.location_on_outlined),
+                            items: [
+                              for (final l in _localidades)
+                                DropdownMenuItem(value: l['_id'] as String, child: Text(l['nombre'])),
+                            ],
+                            onChanged: _localidades.isEmpty
+                                ? null
+                                : (value) => setState(() => _localidadId = value),
                           ),
                           const SizedBox(height: 28),
                           Row(

@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 
 /// Barra de navegación inferior dark premium con 3 destinos:
-/// Inicio · (patita central elevada = escaneo) · Perfil.
+/// Inicio · (patita central elevada = escaneo) · Búsqueda.
 ///
-/// - [currentIndex]: 0 = Inicio, 1 = Perfil (la patita no es un índice, es acción).
-/// - [onTabSelected]: notifica Inicio(0) o Perfil(1).
+/// - [currentIndex]: 0 = Inicio, 1 = Búsqueda (la patita no es un índice, es acción).
+/// - [onTabSelected]: notifica Inicio(0) o Búsqueda(1).
 /// - [onPawTap]: acción del botón central (abrir escaneo).
 class DogBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -60,8 +60,8 @@ class DogBottomNavBar extends StatelessWidget {
                 const SizedBox(width: 72), // hueco para la patita central
                 Expanded(
                   child: _NavItem(
-                    icon: Icons.person_rounded,
-                    label: 'Perfil',
+                    icon: Icons.search_rounded,
+                    label: 'Búsqueda',
                     selected: currentIndex == 1,
                     onTap: () {
                       HapticFeedback.selectionClick();

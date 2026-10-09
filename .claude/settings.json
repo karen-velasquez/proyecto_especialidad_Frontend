@@ -30,7 +30,25 @@
       "Bash(rm -rf assets/models)",
       "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8001)",
       "Bash(adb devices *)",
-      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)"
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "Bash(node scripts/seedBreeds.js)",
+      "Bash(curl -s http://localhost:3000/)",
+      "PowerShell(Start-Sleep -Seconds 3; & \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "Bash(awk '/@override/{c++} c==2{print NR\": \"$0}' lib/screens/profile_page.dart)",
+      "Bash(dart format *)",
+      "Bash(node scripts/seedUbicacion.js)",
+      "Bash(curl -s http://192.168.0.15:3000/)",
+      "Bash(grep -rln 'No se pudo conectar: $e\\\\|No se pudo conectar: \\\\$e' lib/)",
+      "Bash(curl -s http://localhost:8001/docs -o /dev/null -w \"ML service HTTP %{http_code}\")",
+      "Bash(taskkill //F //PID 35544)",
+      "Bash(USE_FACE=true python -m uvicorn main:app --host 0.0.0.0 --port 8001)",
+      "Bash(curl -s http://localhost:8001/health)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/api/identify/historial)",
+      "PowerShell($p = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; if \\(Test-Path $p\\) { & $p devices } else { Write-Output \"not found at $p\" })",
+      "Bash(tee /c/Users/Hp/AppData/Local/Temp/claude/flutter_run.log)",
+      "PowerShell($p = \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\"; & $p devices)",
+      "Bash(tee /c/Users/Hp/AppData/Local/Temp/claude/flutter_run2.log)"
     ]
   }
 }

@@ -95,7 +95,10 @@ class _ProfilePageState extends State<ProfilePage> {
     return Container(
       width: 220,
       height: 220,
-      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.brandGradient),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppColors.brandGradient,
+      ),
       child: const Icon(Icons.person, color: Colors.white, size: 100),
     );
   }
@@ -105,19 +108,30 @@ class _ProfilePageState extends State<ProfilePage> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt, color: AppColors.turquoise),
-              title: const Text('Tomar foto', style: TextStyle(color: AppColors.textPrimary)),
+              title: const Text(
+                'Tomar foto',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppColors.turquoise),
-              title: const Text('Elegir de galería', style: TextStyle(color: AppColors.textPrimary)),
+              leading: const Icon(
+                Icons.photo_library,
+                color: AppColors.turquoise,
+              ),
+              title: const Text(
+                'Elegir de galería',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             const SizedBox(height: 8),
@@ -127,12 +141,18 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (source == null) return;
 
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
     if (picked == null || !mounted) return;
 
     setState(() => _subiendoFoto = true);
     try {
-      final request = http.MultipartRequest('PUT', Uri.parse('${ApiConstants.usersUrl}/me/foto'));
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('${ApiConstants.usersUrl}/me/foto'),
+      );
       request.headers['Authorization'] = 'Bearer ${widget.token}';
       request.files.add(await http.MultipartFile.fromPath('foto', picked.path));
 
@@ -152,9 +172,9 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _subiendoFoto = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo conectar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
     }
   }
 
@@ -176,160 +196,215 @@ class _ProfilePageState extends State<ProfilePage> {
     return n.isEmpty ? 'Mi perfil' : n;
   }
 
+  String? get _ubicacionTexto {
+    final localidad = _profile?['localidad'] as Map<String, dynamic>?;
+    if (localidad == null) return null;
+    final departamento = localidad['departamento'] as Map<String, dynamic>?;
+    if (departamento == null) return localidad['nombre'];
+    return '${localidad['nombre']}, ${departamento['nombre']}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AuroraBackground(
-      child: SafeArea(
-        bottom: false,
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.turquoise),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Mi perfil',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: _editProfile,
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-                          ),
-                          child: const Icon(Icons.edit_outlined, color: AppColors.textPrimary, size: 20),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Avatar + nombre
-                  Center(
-                    child: Column(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AuroraBackground(
+        child: SafeArea(
+          bottom: false,
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.turquoise),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Stack(
-                          children: [
-                            GestureDetector(
-                              onTap: _subiendoFoto ? null : _verFotoPerfil,
-                              child: Container(
-                                width: 140,
-                                height: 140,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: AppColors.brandGradient,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.turquoise.withValues(alpha: 0.45),
-                                      blurRadius: 26,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: _subiendoFoto
-                                    ? const Center(
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                      )
-                                    : (_profile?['foto'] != null
-                                        ? ClipOval(
-                                            child: Image.network(
-                                              _profile!['foto'],
-                                              width: 140,
-                                              height: 140,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  const Icon(Icons.person, color: Colors.white, size: 68),
-                                            ),
-                                          )
-                                        : const Icon(Icons.person, color: Colors.white, size: 68)),
-                              ),
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: GestureDetector(
-                                onTap: _subiendoFoto ? null : _cambiarFoto,
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surface,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: AppColors.bgDeep, width: 2),
-                                  ),
-                                  child: const Icon(Icons.camera_alt, color: AppColors.turquoise, size: 26),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _fullName,
-                          style: const TextStyle(
+                        const Text(
+                          'Mi perfil',
+                          style: TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 20,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${widget.dogCount} mascota${widget.dogCount == 1 ? '' : 's'} registrada${widget.dogCount == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // Datos personales
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Información personal',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                        GestureDetector(
+                          onTap: _editProfile,
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.10),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.edit_outlined,
+                              color: AppColors.textPrimary,
+                              size: 20,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        _infoRow(Icons.badge_outlined, 'Carnet',
-                            _profile?['carnet']?.toString()),
-                        _infoRow(Icons.email_outlined, 'Correo',
-                            _profile?['email']),
-                        _infoRow(Icons.phone_outlined, 'Teléfono',
-                            _profile?['telefono']),
-                        _infoRow(
-                          Icons.cake_outlined,
-                          'Nacimiento',
-                          _profile?['fechaNacimiento'] is String
-                              ? (_profile!['fechaNacimiento'] as String)
-                                  .substring(0, 10)
-                              : null,
-                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                ],
-              ),
+                    // Avatar + nombre
+                    Center(
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: _subiendoFoto ? null : _verFotoPerfil,
+                                child: Container(
+                                  width: 140,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: AppColors.brandGradient,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.turquoise.withValues(
+                                          alpha: 0.45,
+                                        ),
+                                        blurRadius: 26,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: _subiendoFoto
+                                      ? const Center(
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.5,
+                                          ),
+                                        )
+                                      : (_profile?['foto'] != null
+                                            ? ClipOval(
+                                                child: Image.network(
+                                                  _profile!['foto'],
+                                                  width: 140,
+                                                  height: 140,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      const Icon(
+                                                        Icons.person,
+                                                        color: Colors.white,
+                                                        size: 68,
+                                                      ),
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.person,
+                                                color: Colors.white,
+                                                size: 68,
+                                              )),
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: GestureDetector(
+                                  onTap: _subiendoFoto ? null : _cambiarFoto,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppColors.bgDeep,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      color: AppColors.turquoise,
+                                      size: 26,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _fullName,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.dogCount} mascota${widget.dogCount == 1 ? '' : 's'} registrada${widget.dogCount == 1 ? '' : 's'}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Datos personales
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Información personal',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          _infoRow(
+                            Icons.badge_outlined,
+                            'Carnet',
+                            _profile?['carnet']?.toString(),
+                          ),
+                          _infoRow(
+                            Icons.email_outlined,
+                            'Correo',
+                            _profile?['email'],
+                          ),
+                          _infoRow(
+                            Icons.phone_outlined,
+                            'Teléfono',
+                            _profile?['telefono'],
+                          ),
+                          _infoRow(
+                            Icons.cake_outlined,
+                            'Nacimiento',
+                            _profile?['fechaNacimiento'] is String
+                                ? (_profile!['fechaNacimiento'] as String)
+                                      .substring(0, 10)
+                                : null,
+                          ),
+                          _infoRow(
+                            Icons.location_on_outlined,
+                            'Ubicación',
+                            _ubicacionTexto,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -352,7 +427,9 @@ class _ProfilePageState extends State<ProfilePage> {
           Text(
             label,
             style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 13),
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
           ),
           const Spacer(),
           Flexible(
@@ -360,9 +437,10 @@ class _ProfilePageState extends State<ProfilePage> {
               shown,
               textAlign: TextAlign.right,
               style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500),
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
